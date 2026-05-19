@@ -26,7 +26,7 @@ Set the required environment variables:
 ```bash
 export LINKEDIN_ACCESS_TOKEN="..."
 export LINKEDIN_AUTHOR_URN="urn:li:person:YOUR_ID"
-export LINKEDIN_API_VERSION="202505"
+export LINKEDIN_API_VERSION="YYYYMM"
 ```
 
 Then publish a post:
@@ -50,12 +50,14 @@ You can also pass values as flags:
 uv run linkedin-cli post \
   --access-token "..." \
   --author "urn:li:person:YOUR_ID" \
-  --api-version "202505" \
+  --api-version "YYYYMM" \
   "Shipping a tiny CLI."
 ```
 
-Need help getting `LINKEDIN_ACCESS_TOKEN` and `LINKEDIN_AUTHOR_URN`?
-See [docs/credentials.md](docs/credentials.md).
+## Docs
+
+- [docs/onboarding.md](docs/onboarding.md) for the full step-by-step setup flow
+- [docs/credentials.md](docs/credentials.md) for the local env file layout and variable reference
 
 ## LinkedIn requirements
 

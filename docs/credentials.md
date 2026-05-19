@@ -1,84 +1,57 @@
-# LinkedIn credentials
+# Credentials and local environment
 
-This CLI expects you to bring two values:
+This project expects three environment variables at runtime:
 
 - `LINKEDIN_ACCESS_TOKEN`
 - `LINKEDIN_AUTHOR_URN`
+- `LINKEDIN_API_VERSION`
 
-## 1. Create a LinkedIn app
-
-Create or open an app in the [LinkedIn Developer Portal](https://www.linkedin.com/developers/apps).
-
-For member posting, make sure the app has access to:
-
-- `Share on LinkedIn` for the `w_member_social` permission
-- `Sign In with LinkedIn` so you can identify the authenticated member
-
-Also configure a redirect URL on the app, for example:
-
-```text
-http://localhost:8000/callback
-```
-
-## 2. Run the OAuth member flow
-
-Use LinkedIn's OAuth 2.0 member flow and request at least:
-
-- `w_member_social`
-- `openid profile email`
-
-If you are using the older profile flow, `r_liteprofile` also works for retrieving the member id.
-
-Once you exchange the authorization `code` for a token, that token becomes your:
+Recommended local setup:
 
 ```bash
-export LINKEDIN_ACCESS_TOKEN="..."
+mkdir -p ~/.config/linkedin-cli
+chmod 700 ~/.config/linkedin-cli
 ```
 
-## 3. Fetch your member id
-
-Call the profile endpoint with the access token:
+Store secrets in a local shell file that is not part of the repo:
 
 ```bash
-curl -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
-  https://api.linkedin.com/v2/me
+cat > ~/.config/linkedin-cli/env.sh <<'EOF'
+export LINKEDIN_CLIENT_ID='YOUR_CLIENT_ID'
+export LINKEDIN_CLIENT_SECRET='YOUR_CLIENT_SECRET'
+export LINKEDIN_REDIRECT_URI='http://localhost:8000/callback'
+export LINKEDIN_SCOPE='w_member_social openid profile email'
+
+# Fill these after completing OAuth.
+export LINKEDIN_ACCESS_TOKEN=''
+export LINKEDIN_AUTHOR_URN=''
+
+# Must be YYYYMM, not YYYYMMDD.
+export LINKEDIN_API_VERSION='202604'
+EOF
+
+chmod 600 ~/.config/linkedin-cli/env.sh
 ```
 
-The response includes an `id`, for example:
-
-```json
-{
-  "id": "abc123"
-}
-```
-
-Build the author URN from that id:
+Load it when needed:
 
 ```bash
-export LINKEDIN_AUTHOR_URN="urn:li:person:abc123"
+source ~/.config/linkedin-cli/env.sh
 ```
 
-## 4. Set the API version
+Good storage options:
 
-The Posts API requires a `Linkedin-Version` header in `YYYYMM` format.
-
-```bash
-export LINKEDIN_API_VERSION="202505"
-```
-
-## 5. Where to store these values
-
-Good options:
-
-- export them in the current shell for one-off usage
-- add them to `~/.zshrc` if you want them available in every shell
-- keep them in a local secrets file such as `~/.env.linkedin` and source it manually
+- `~/.config/linkedin-cli/env.sh`
+- `~/.zshrc` if you want values loaded in every shell
+- another local secrets file that you source manually
 
 Avoid storing tokens in tracked repo files.
 
-## Official docs
+## Notes
 
-- [Getting access to LinkedIn APIs](https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access)
-- [Sign In with LinkedIn](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin)
-- [Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-05)
-- [URNs and IDs](https://learn.microsoft.com/en-us/linkedin/shared/api-guide/concepts/urns?context=linkedin%2Fcontext)
+- `LINKEDIN_AUTHOR_URN` should look like `urn:li:person:abc123`.
+- `LINKEDIN_API_VERSION` must use `YYYYMM`.
+- A value such as `20250501` is invalid and will cause `426 Requested version ... is not active`.
+- Active versions change over time. If a version stops working, update it to a currently active `YYYYMM`.
+
+See [onboarding.md](onboarding.md) for the full step-by-step setup flow.
