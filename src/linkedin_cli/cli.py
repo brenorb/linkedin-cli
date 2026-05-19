@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Protocol
 
 from linkedin_cli.client import DEFAULT_API_VERSION, LinkedInApiError, LinkedInClient
@@ -11,6 +12,15 @@ from linkedin_cli.client import DEFAULT_API_VERSION, LinkedInApiError, LinkedInC
 
 class LinkedInPostClient(Protocol):
     def create_text_post(self, *, author: str, commentary: str, visibility: str) -> object: ...
+    def create_image_post(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        image_path: Path,
+        alt_text: str | None = None,
+    ) -> object: ...
 
 
 class ClientFactory(Protocol):
@@ -26,6 +36,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     post_parser = subparsers.add_parser("post", help="Publish a text post")
     post_parser.add_argument("commentary", nargs="+", help="Post text")
+    post_parser.add_argument("--image", type=Path, help="Path to an image to upload and attach")
+    post_parser.add_argument("--alt-text", help="Alt text for the uploaded image")
     post_parser.add_argument("--author", help="Author URN, for example urn:li:person:abc123")
     post_parser.add_argument("--access-token", help="OAuth access token")
     post_parser.add_argument(
@@ -73,13 +85,27 @@ def _run_post(
         print(f"Missing required configuration: {', '.join(missing)}.", file=sys.stderr)
         return 2
 
+    if args.alt_text and not args.image:
+        print("Missing required configuration: alt text requires an image.", file=sys.stderr)
+        return 2
+
     client = client_factory(access_token=access_token, api_version=api_version)
     try:
-        result = client.create_text_post(
-            author=author,
-            commentary=" ".join(args.commentary),
-            visibility=args.visibility,
-        )
+        commentary = " ".join(args.commentary)
+        if args.image:
+            result = client.create_image_post(
+                author=author,
+                commentary=commentary,
+                visibility=args.visibility,
+                image_path=args.image,
+                alt_text=args.alt_text,
+            )
+        else:
+            result = client.create_text_post(
+                author=author,
+                commentary=commentary,
+                visibility=args.visibility,
+            )
     except LinkedInApiError as exc:
         print(str(exc), file=sys.stderr)
         return 1
