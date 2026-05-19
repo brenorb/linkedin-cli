@@ -2,13 +2,6 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 
-[options]
-exclude-newer = "2026-05-12T14:15:31.666656Z"
-exclude-newer-span = "P7D"
-
-[options.exclude-newer-package]
-docs2epub = false
-
 [[package]]
 name = "anyio"
 version = "4.13.0"
