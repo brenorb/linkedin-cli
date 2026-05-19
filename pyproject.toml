@@ -1,0 +1,31 @@
+[project]
+name = "linkedin-cli"
+version = "0.1.0"
+description = "Minimal CLI for publishing LinkedIn text posts with the Posts API"
+readme = "README.md"
+authors = [
+    { name = "Breno Brito", email = "brenorb@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+]
+
+[project.scripts]
+linkedin-cli = "linkedin_cli:main"
+
+[build-system]
+requires = ["uv_build>=0.10.8,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "ruff>=0.15.12",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
