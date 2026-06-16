@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from linkedin_cli.employment import normalize_current_position, normalize_positions_payload
+
 DEFAULT_API_VERSION = "202505"
 
 
@@ -77,6 +79,18 @@ class LinkedInClient:
         body = _response_json(response)
         post_id = response.headers.get("x-restli-id") or body.get("id")
         return PostCreationResult(post_id=post_id, response=body)
+
+    def get_employment_history(self) -> list[dict[str, object]]:
+        response = self._client.get("/v2/me", params={"projection": "(positions)"})
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+        return normalize_positions_payload(_response_json(response))
+
+    def get_current_employment(self) -> list[dict[str, object]]:
+        response = self._client.get("/rest/identityMe")
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+        return normalize_current_position(_response_json(response))
 
     def create_image_post(
         self,

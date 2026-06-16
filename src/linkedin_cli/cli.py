@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from collections.abc import Mapping, Sequence
+from datetime import date
 from pathlib import Path
 from typing import Protocol
 
 from linkedin_cli.client import DEFAULT_API_VERSION, LinkedInApiError, LinkedInClient
+from linkedin_cli.employment import filter_employment_history
 
 
 class LinkedInPostClient(Protocol):
@@ -21,6 +24,8 @@ class LinkedInPostClient(Protocol):
         image_path: Path,
         alt_text: str | None = None,
     ) -> object: ...
+    def get_employment_history(self) -> list[dict[str, object]]: ...
+    def get_current_employment(self) -> list[dict[str, object]]: ...
 
 
 class ClientFactory(Protocol):
@@ -46,6 +51,25 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"LinkedIn API version in YYYYMM format. Defaults to {DEFAULT_API_VERSION}.",
     )
     post_parser.add_argument("--visibility", default="PUBLIC", help="LinkedIn post visibility")
+
+    profile_parser = subparsers.add_parser("profile", help="Read supported LinkedIn profile data")
+    profile_subparsers = profile_parser.add_subparsers(dest="profile_command", required=True)
+    employment_parser = profile_subparsers.add_parser(
+        "employment-history",
+        help="Read employment data from supported LinkedIn profile APIs",
+    )
+    employment_parser.add_argument(
+        "--source",
+        choices=("profile-api", "identity-me"),
+        default="profile-api",
+        help="Official LinkedIn API source.",
+    )
+    employment_parser.add_argument(
+        "--years",
+        type=int,
+        default=5,
+        help="Return only employment records overlapping the last N years.",
+    )
     return parser
 
 
@@ -61,6 +85,8 @@ def main(
 
     if args.command == "post":
         return _run_post(args, environment, client_factory or _default_client_factory)
+    if args.command == "profile" and args.profile_command == "employment-history":
+        return _run_employment_history(args, environment, client_factory or _default_client_factory)
 
     parser.error(f"unknown command: {args.command}")
     return 2
@@ -119,6 +145,37 @@ def _run_post(
         print(f"Created post {post_id}")
     else:
         print("Created post")
+    return 0
+
+
+def _run_employment_history(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> int:
+    access_token = env.get("LINKEDIN_ACCESS_TOKEN")
+    api_version = env.get("LINKEDIN_API_VERSION") or DEFAULT_API_VERSION
+
+    if not access_token:
+        print("Missing required configuration: access token.", file=sys.stderr)
+        return 2
+
+    client = client_factory(access_token=access_token, api_version=api_version)
+    try:
+        if args.source == "identity-me":
+            records = client.get_current_employment()
+        else:
+            records = client.get_employment_history()
+        filtered = filter_employment_history(records, years=args.years, today=date.today())
+    except LinkedInApiError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        close = getattr(client, "close", None)
+        if callable(close):
+            close()
+
+    print(json.dumps(filtered, indent=2))
     return 0
 
 

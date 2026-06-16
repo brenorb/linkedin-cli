@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from linkedin_cli.cli import main
+from linkedin_cli.client import LinkedInApiError
 
 
 def test_cli_post_reads_required_values_from_environment(capsys: pytest.CaptureFixture[str]) -> None:
@@ -129,6 +130,136 @@ def test_cli_post_requires_author_and_access_token(capsys: pytest.CaptureFixture
     assert exit_code == 2
     assert "access token" in stderr.lower()
     assert "author urn" in stderr.lower()
+
+
+def test_cli_profile_employment_history_reads_positions_from_profile_api(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_employment_history(self) -> list[dict[str, object]]:
+            captured["called"] = "profile-api"
+            return [
+                {
+                    "employer_name": "FACTORED",
+                    "job_title": "AI Engineer",
+                    "start_date": "2024-01",
+                    "end_date": None,
+                    "is_current": True,
+                }
+            ]
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["profile", "employment-history"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "called": "profile-api",
+    }
+    assert '"FACTORED"' in stdout
+    assert '"AI Engineer"' in stdout
+
+
+def test_cli_profile_employment_history_can_use_identity_me(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_current_employment(self) -> list[dict[str, object]]:
+            captured["called"] = "identity-me"
+            return [
+                {
+                    "employer_name": "LinkedIn",
+                    "job_title": "Senior Software Engineer",
+                    "start_date": "2022-01",
+                    "end_date": None,
+                    "is_current": True,
+                }
+            ]
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["profile", "employment-history", "--source", "identity-me"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202510.03",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202510.03",
+        "called": "identity-me",
+    }
+    assert '"LinkedIn"' in stdout
+    assert '"Senior Software Engineer"' in stdout
+
+
+def test_cli_profile_employment_history_requires_access_token(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main(
+        ["profile", "employment-history"],
+        env={},
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "access token" in stderr.lower()
+
+
+def test_cli_profile_employment_history_returns_1_on_api_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    closed = False
+
+    class StubClient:
+        def get_employment_history(self) -> list[dict[str, object]]:
+            raise LinkedInApiError(403, "Access denied")
+
+        def close(self) -> None:
+            nonlocal closed
+            closed = True
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        return StubClient()
+
+    exit_code = main(
+        ["profile", "employment-history"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+        },
+        client_factory=client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 1
+    assert closed is True
+    assert "403" in stderr
 
 
 def _unused_client_factory(*, access_token: str, api_version: str) -> object:

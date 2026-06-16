@@ -11,6 +11,12 @@ It covers:
 5. saving local environment variables
 6. verifying text and image posts
 
+Employment-data support is separate and more constrained:
+
+- `profile employment-history --source identity-me` uses the Verified on LinkedIn `GET /rest/identityMe` endpoint.
+- Current position on `identityMe` requires Plus tier and the `r_primary_current_experience` scope.
+- Multi-position history through the older Profile API depends on restricted access to `positions` under `r_fullprofile`, which LinkedIn documents as closed.
+
 ## Prerequisites
 
 - a LinkedIn account

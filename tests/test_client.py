@@ -172,3 +172,118 @@ def test_create_image_post_raises_clear_error_when_upload_init_fails(tmp_path: P
             commentary="Hello with image",
             image_path=image_path,
         )
+
+
+def test_get_employment_history_uses_profile_api_projection() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/v2/me"
+        assert request.url.params["projection"] == "(positions)"
+        assert request.headers["Authorization"] == "Bearer test-token"
+        assert request.headers["X-Restli-Protocol-Version"] == "2.0.0"
+        return httpx.Response(
+            200,
+            json={
+                "positions": {
+                    "elements": [
+                        {
+                            "companyName": {
+                                "localized": {
+                                    "en_US": "FACTORED",
+                                },
+                                "preferredLocale": {
+                                    "country": "US",
+                                    "language": "en",
+                                },
+                            },
+                            "title": {
+                                "localized": {
+                                    "en_US": "AI Engineer",
+                                },
+                                "preferredLocale": {
+                                    "country": "US",
+                                    "language": "en",
+                                },
+                            },
+                            "startMonthYear": {
+                                "month": 1,
+                                "year": 2024,
+                            },
+                        }
+                    ]
+                }
+            },
+        )
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.get_employment_history()
+
+    assert result == [
+        {
+            "employer_name": "FACTORED",
+            "job_title": "AI Engineer",
+            "start_date": "2024-01",
+            "end_date": None,
+            "is_current": True,
+        }
+    ]
+
+
+def test_get_current_employment_uses_identity_me() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == httpx.URL("https://api.linkedin.com/rest/identityMe")
+        assert request.headers["Authorization"] == "Bearer test-token"
+        assert request.headers["Linkedin-Version"] == "202510.03"
+        return httpx.Response(
+            200,
+            json={
+                "primaryCurrentPosition": {
+                    "title": {
+                        "localized": {
+                            "en_US": "Senior Software Engineer",
+                        },
+                        "preferredLocale": {
+                            "country": "US",
+                            "language": "en",
+                        },
+                    },
+                    "companyName": {
+                        "localized": {
+                            "en_US": "LinkedIn",
+                        },
+                        "preferredLocale": {
+                            "country": "US",
+                            "language": "en",
+                        },
+                    },
+                    "startedOn": {
+                        "month": 1,
+                        "year": 2022,
+                    },
+                }
+            },
+        )
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202510.03",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.get_current_employment()
+
+    assert result == [
+        {
+            "employer_name": "LinkedIn",
+            "job_title": "Senior Software Engineer",
+            "start_date": "2022-01",
+            "end_date": None,
+            "is_current": True,
+        }
+    ]
