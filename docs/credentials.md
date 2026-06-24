@@ -9,14 +9,14 @@ This project expects three environment variables at runtime:
 Recommended local setup:
 
 ```bash
-mkdir -p ~/.config/linkedin-cli
-chmod 700 ~/.config/linkedin-cli
+mkdir -p ~/.config/licli
+chmod 700 ~/.config/licli
 ```
 
 Store secrets in a local shell file that is not part of the repo:
 
 ```bash
-cat > ~/.config/linkedin-cli/env.sh <<'EOF'
+cat > ~/.config/licli/env.sh <<'EOF'
 export LINKEDIN_CLIENT_ID='YOUR_CLIENT_ID'
 export LINKEDIN_CLIENT_SECRET='YOUR_CLIENT_SECRET'
 export LINKEDIN_REDIRECT_URI='http://localhost:8000/callback'
@@ -30,18 +30,18 @@ export LINKEDIN_AUTHOR_URN=''
 export LINKEDIN_API_VERSION='202604'
 EOF
 
-chmod 600 ~/.config/linkedin-cli/env.sh
+chmod 600 ~/.config/licli/env.sh
 ```
 
 Load it when needed:
 
 ```bash
-source ~/.config/linkedin-cli/env.sh
+source ~/.config/licli/env.sh
 ```
 
 Good storage options:
 
-- `~/.config/linkedin-cli/env.sh`
+- `~/.config/licli/env.sh`
 - `~/.zshrc` if you want values loaded in every shell
 - another local secrets file that you source manually
 

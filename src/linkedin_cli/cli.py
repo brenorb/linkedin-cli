@@ -43,7 +43,7 @@ class ClientFactory(Protocol):
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="linkedin-cli",
+        prog="licli",
         description="Publish a plain-text post with LinkedIn's Posts API.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

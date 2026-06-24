@@ -2,6 +2,13 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 
+[options]
+exclude-newer = "2026-06-17T18:46:19.955159Z"
+exclude-newer-span = "P7D"
+
+[options.exclude-newer-package]
+docs2epub = false
+
 [[package]]
 name = "anyio"
 version = "4.13.0"
@@ -89,7 +96,7 @@ wheels = [
 ]
 
 [[package]]
-name = "linkedin-cli"
+name = "licli"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

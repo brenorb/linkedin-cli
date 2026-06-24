@@ -1,4 +1,4 @@
-# linkedin-cli
+# licli
 
 Small CLI for supported LinkedIn API workflows.
 
@@ -35,13 +35,13 @@ export LINKEDIN_API_VERSION="YYYYMM"
 Then publish a post:
 
 ```bash
-uv run linkedin-cli post "Hello from the new Posts API"
+uv run licli post "Hello from the new Posts API"
 ```
 
 Publish a post with an image:
 
 ```bash
-uv run linkedin-cli post \
+uv run licli post \
   --image /absolute/path/to/banner.png \
   --alt-text "Bitdevs BSB event banner" \
   "Hello from the new Posts API"
@@ -50,7 +50,7 @@ uv run linkedin-cli post \
 Publish a post with a video:
 
 ```bash
-uv run linkedin-cli post \
+uv run licli post \
   --video /absolute/path/to/clip.mp4 \
   --video-title "Linus on abstraction" \
   "Hello from the new Posts API"
@@ -59,7 +59,7 @@ uv run linkedin-cli post \
 You can also pass values as flags:
 
 ```bash
-uv run linkedin-cli post \
+uv run licli post \
   --access-token "..." \
   --author "urn:li:person:YOUR_ID" \
   --api-version "YYYYMM" \
@@ -69,19 +69,19 @@ uv run linkedin-cli post \
 Read employment data through official profile APIs:
 
 ```bash
-uv run linkedin-cli profile employment-history
+uv run licli profile employment-history
 ```
 
 Use the Verified on LinkedIn `identityMe` endpoint instead:
 
 ```bash
-uv run linkedin-cli profile employment-history --source identity-me
+uv run licli profile employment-history --source identity-me
 ```
 
 Limit output to a different lookback window:
 
 ```bash
-uv run linkedin-cli profile employment-history --years 3
+uv run licli profile employment-history --years 3
 ```
 
 ## Docs

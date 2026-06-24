@@ -1,6 +1,6 @@
 # LinkedIn onboarding
 
-This guide walks through the full member-posting setup for `linkedin-cli` without exposing your token to anyone else.
+This guide walks through the full member-posting setup for `licli` without exposing your token to anyone else.
 
 It covers:
 
@@ -56,12 +56,12 @@ If the redirect URI used during token exchange does not exactly match the one us
 Create a local env file:
 
 ```bash
-mkdir -p ~/.config/linkedin-cli
-chmod 700 ~/.config/linkedin-cli
+mkdir -p ~/.config/licli
+chmod 700 ~/.config/licli
 ```
 
 ```bash
-cat > ~/.config/linkedin-cli/env.sh <<'EOF'
+cat > ~/.config/licli/env.sh <<'EOF'
 export LINKEDIN_CLIENT_ID='YOUR_CLIENT_ID'
 export LINKEDIN_CLIENT_SECRET='YOUR_CLIENT_SECRET'
 export LINKEDIN_REDIRECT_URI='http://localhost:8000/callback'
@@ -69,8 +69,8 @@ export LINKEDIN_SCOPE='w_member_social openid profile email'
 export LINKEDIN_API_VERSION='202604'
 EOF
 
-chmod 600 ~/.config/linkedin-cli/env.sh
-source ~/.config/linkedin-cli/env.sh
+chmod 600 ~/.config/licli/env.sh
+source ~/.config/licli/env.sh
 ```
 
 ## 3. Generate the authorization URL
@@ -152,9 +152,9 @@ print(json.load(sys.stdin)["access_token"])
 PY
 )
 
-printf "export LINKEDIN_ACCESS_TOKEN='%s'\n" "$LINKEDIN_ACCESS_TOKEN" >> ~/.config/linkedin-cli/env.sh
-chmod 600 ~/.config/linkedin-cli/env.sh
-source ~/.config/linkedin-cli/env.sh
+printf "export LINKEDIN_ACCESS_TOKEN='%s'\n" "$LINKEDIN_ACCESS_TOKEN" >> ~/.config/licli/env.sh
+chmod 600 ~/.config/licli/env.sh
+source ~/.config/licli/env.sh
 ```
 
 If `id_token` is present, save it too:
@@ -168,8 +168,8 @@ PY
 )
 
 if [ -n "$LINKEDIN_ID_TOKEN" ]; then
-  printf "export LINKEDIN_ID_TOKEN='%s'\n" "$LINKEDIN_ID_TOKEN" >> ~/.config/linkedin-cli/env.sh
-  source ~/.config/linkedin-cli/env.sh
+  printf "export LINKEDIN_ID_TOKEN='%s'\n" "$LINKEDIN_ID_TOKEN" >> ~/.config/licli/env.sh
+  source ~/.config/licli/env.sh
 fi
 ```
 
@@ -198,8 +198,8 @@ print(json.load(sys.stdin)["sub"])
 PY
 )
 
-printf "export LINKEDIN_AUTHOR_URN='urn:li:person:%s'\n" "$LINKEDIN_PERSON_ID" >> ~/.config/linkedin-cli/env.sh
-source ~/.config/linkedin-cli/env.sh
+printf "export LINKEDIN_AUTHOR_URN='urn:li:person:%s'\n" "$LINKEDIN_PERSON_ID" >> ~/.config/licli/env.sh
+source ~/.config/licli/env.sh
 ```
 
 ### Fallback path: use `id_token`
@@ -230,8 +230,8 @@ print(data["sub"])
 PY
 )
 
-printf "export LINKEDIN_AUTHOR_URN='urn:li:person:%s'\n" "$LINKEDIN_PERSON_ID" >> ~/.config/linkedin-cli/env.sh
-source ~/.config/linkedin-cli/env.sh
+printf "export LINKEDIN_AUTHOR_URN='urn:li:person:%s'\n" "$LINKEDIN_PERSON_ID" >> ~/.config/licli/env.sh
+source ~/.config/licli/env.sh
 ```
 
 ## 7. Verify the final environment
@@ -252,18 +252,18 @@ Expected:
 
 ```bash
 cd /Users/breno/Documents/code/PROJECTS/linkedin-cli
-source ~/.config/linkedin-cli/env.sh
+source ~/.config/licli/env.sh
 
-uv run linkedin-cli post "Hello from the LinkedIn Posts API"
+uv run licli post "Hello from the LinkedIn Posts API"
 ```
 
 ## 9. Post an image post
 
 ```bash
 cd /Users/breno/Documents/code/PROJECTS/linkedin-cli
-source ~/.config/linkedin-cli/env.sh
+source ~/.config/licli/env.sh
 
-uv run linkedin-cli post \
+uv run licli post \
   --image /absolute/path/to/banner.png \
   --alt-text "Descriptive alt text" \
   "Hello from the LinkedIn Posts API"
@@ -273,9 +273,9 @@ uv run linkedin-cli post \
 
 ```bash
 cd /Users/breno/Documents/code/PROJECTS/linkedin-cli
-source ~/.config/linkedin-cli/env.sh
+source ~/.config/licli/env.sh
 
-uv run linkedin-cli post \
+uv run licli post \
   --video /absolute/path/to/clip.mp4 \
   --video-title "Linus on abstraction" \
   "Hello from the LinkedIn Posts API"
@@ -344,10 +344,10 @@ If you hit this error:
 If the CLI works with:
 
 ```bash
-uv run linkedin-cli post --api-version 202604 ...
+uv run licli post --api-version 202604 ...
 ```
 
-then your local env file still has an invalid or stale version. Update `~/.config/linkedin-cli/env.sh`.
+then your local env file still has an invalid or stale version. Update `~/.config/licli/env.sh`.
 
 ## Official docs
 
