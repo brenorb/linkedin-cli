@@ -88,6 +88,7 @@ uv run licli profile employment-history --years 3
 
 - [docs/onboarding.md](docs/onboarding.md) for the full step-by-step setup flow
 - [docs/credentials.md](docs/credentials.md) for the local env file layout and variable reference
+- [docs/pypi-publishing.md](docs/pypi-publishing.md) for the GitHub-to-PyPI release flow
 
 ## LinkedIn requirements
 
