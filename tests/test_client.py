@@ -96,8 +96,8 @@ def test_create_image_post_initializes_upload_uploads_binary_and_creates_post(
 
         if request.url == httpx.URL("https://www.linkedin.com/dms-uploads/example/uploaded-image/0"):
             assert request.method == "PUT"
-            assert request.headers["Authorization"] == "Bearer test-token"
             assert request.headers["Content-Type"] == "image/png"
+            assert request.extensions["timeout"]["write"] == 300.0
             assert request.content == image_bytes
             return httpx.Response(201)
 
@@ -221,17 +221,17 @@ def test_create_video_post_initializes_upload_uploads_parts_finalizes_and_create
 
         if request.url == httpx.URL("https://www.linkedin.com/dms-uploads/example/uploaded-video/0"):
             assert request.method == "PUT"
-            assert request.headers["Authorization"] == "Bearer test-token"
             assert request.headers["Content-Type"] == "application/octet-stream"
+            assert request.extensions["timeout"]["write"] == 300.0
             assert request.content == b"abcd"
-            return httpx.Response(201, headers={"ETag": '"etag-1"'})
+            return httpx.Response(200, headers={"ETag": '/ambry-videoei/signedId/part-1.bin'})
 
         if request.url == httpx.URL("https://www.linkedin.com/dms-uploads/example/uploaded-video/1"):
             assert request.method == "PUT"
-            assert request.headers["Authorization"] == "Bearer test-token"
             assert request.headers["Content-Type"] == "application/octet-stream"
+            assert request.extensions["timeout"]["write"] == 300.0
             assert request.content == b"efgh"
-            return httpx.Response(201, headers={"ETag": '"etag-2"'})
+            return httpx.Response(200, headers={"ETag": '/ambry-videoei/signedId/part-2.bin'})
 
         if request.url == httpx.URL("https://api.linkedin.com/rest/videos?action=finalizeUpload"):
             payload = json.loads(request.content.decode("utf-8"))
@@ -239,7 +239,10 @@ def test_create_video_post_initializes_upload_uploads_parts_finalizes_and_create
                 "finalizeUploadRequest": {
                     "video": "urn:li:video:123",
                     "uploadToken": "upload-token",
-                    "uploadedPartIds": ["etag-1", "etag-2"],
+                    "uploadedPartIds": [
+                        "/ambry-videoei/signedId/part-1.bin",
+                        "/ambry-videoei/signedId/part-2.bin",
+                    ],
                 }
             }
             return httpx.Response(200, json={})

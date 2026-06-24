@@ -38,6 +38,7 @@ class LinkedInClient:
         base_url: str = "https://api.linkedin.com",
         transport: httpx.BaseTransport | None = None,
         timeout: float = 10.0,
+        media_upload_timeout: float = 300.0,
         video_wait_timeout: float = 300.0,
         video_wait_interval: float = 2.0,
     ) -> None:
@@ -52,11 +53,18 @@ class LinkedInClient:
                 "X-Restli-Protocol-Version": "2.0.0",
             },
         )
+        self._upload_client = httpx.Client(
+            transport=transport,
+            timeout=timeout,
+            follow_redirects=True,
+        )
+        self._media_upload_timeout = media_upload_timeout
         self._video_wait_timeout = video_wait_timeout
         self._video_wait_interval = video_wait_interval
 
     def close(self) -> None:
         self._client.close()
+        self._upload_client.close()
 
     def create_text_post(
         self,
@@ -194,10 +202,11 @@ class LinkedInClient:
 
     def _upload_image(self, *, upload_url: str, image_path: Path) -> None:
         content_type = mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"
-        response = self._client.put(
+        response = self._upload_client.put(
             upload_url,
             content=image_path.read_bytes(),
             headers={"Content-Type": content_type},
+            timeout=self._media_upload_timeout,
         )
         if response.is_error:
             raise LinkedInApiError(response.status_code, _extract_error_message(response))
@@ -258,10 +267,11 @@ class LinkedInClient:
 
                 video_file.seek(first_byte)
                 chunk = video_file.read(last_byte - first_byte + 1)
-                response = self._client.put(
+                response = self._upload_client.put(
                     upload_url,
                     content=chunk,
                     headers={"Content-Type": "application/octet-stream"},
+                    timeout=self._media_upload_timeout,
                 )
                 if response.is_error:
                     raise LinkedInApiError(response.status_code, _extract_error_message(response))
