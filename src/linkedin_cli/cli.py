@@ -24,6 +24,15 @@ class LinkedInPostClient(Protocol):
         image_path: Path,
         alt_text: str | None = None,
     ) -> object: ...
+    def create_video_post(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        video_path: Path,
+        title: str | None = None,
+    ) -> object: ...
     def get_employment_history(self) -> list[dict[str, object]]: ...
     def get_current_employment(self) -> list[dict[str, object]]: ...
 
@@ -43,6 +52,8 @@ def build_parser() -> argparse.ArgumentParser:
     post_parser.add_argument("commentary", nargs="+", help="Post text")
     post_parser.add_argument("--image", type=Path, help="Path to an image to upload and attach")
     post_parser.add_argument("--alt-text", help="Alt text for the uploaded image")
+    post_parser.add_argument("--video", type=Path, help="Path to a video to upload and attach")
+    post_parser.add_argument("--video-title", help="Title for the uploaded video")
     post_parser.add_argument("--author", help="Author URN, for example urn:li:person:abc123")
     post_parser.add_argument("--access-token", help="OAuth access token")
     post_parser.add_argument(
@@ -115,6 +126,10 @@ def _run_post(
         print("Missing required configuration: alt text requires an image.", file=sys.stderr)
         return 2
 
+    if args.image and args.video:
+        print("Missing required configuration: choose either an image or a video, not both.", file=sys.stderr)
+        return 2
+
     client = client_factory(access_token=access_token, api_version=api_version)
     try:
         commentary = " ".join(args.commentary)
@@ -125,6 +140,14 @@ def _run_post(
                 visibility=args.visibility,
                 image_path=args.image,
                 alt_text=args.alt_text,
+            )
+        elif args.video:
+            result = client.create_video_post(
+                author=author,
+                commentary=commentary,
+                visibility=args.visibility,
+                video_path=args.video,
+                title=args.video_title,
             )
         else:
             result = client.create_text_post(

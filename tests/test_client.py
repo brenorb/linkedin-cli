@@ -174,6 +174,137 @@ def test_create_image_post_raises_clear_error_when_upload_init_fails(tmp_path: P
         )
 
 
+def test_create_video_post_initializes_upload_uploads_parts_finalizes_and_creates_post(
+    tmp_path: Path,
+) -> None:
+    video_path = tmp_path / "clip.mp4"
+    video_bytes = b"abcdefgh"
+    video_path.write_bytes(video_bytes)
+    requests: list[httpx.Request] = []
+    status_polls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal status_polls
+        requests.append(request)
+
+        if request.url == httpx.URL("https://api.linkedin.com/rest/videos?action=initializeUpload"):
+            payload = json.loads(request.content.decode("utf-8"))
+            assert payload == {
+                "initializeUploadRequest": {
+                    "owner": "urn:li:person:abc123",
+                    "fileSizeBytes": 8,
+                    "uploadCaptions": False,
+                    "uploadThumbnail": False,
+                }
+            }
+            return httpx.Response(
+                200,
+                json={
+                    "value": {
+                        "video": "urn:li:video:123",
+                        "uploadToken": "upload-token",
+                        "uploadInstructions": [
+                            {
+                                "uploadUrl": "https://www.linkedin.com/dms-uploads/example/uploaded-video/0",
+                                "firstByte": 0,
+                                "lastByte": 3,
+                            },
+                            {
+                                "uploadUrl": "https://www.linkedin.com/dms-uploads/example/uploaded-video/1",
+                                "firstByte": 4,
+                                "lastByte": 7,
+                            },
+                        ],
+                    }
+                },
+            )
+
+        if request.url == httpx.URL("https://www.linkedin.com/dms-uploads/example/uploaded-video/0"):
+            assert request.method == "PUT"
+            assert request.headers["Authorization"] == "Bearer test-token"
+            assert request.headers["Content-Type"] == "application/octet-stream"
+            assert request.content == b"abcd"
+            return httpx.Response(201, headers={"ETag": '"etag-1"'})
+
+        if request.url == httpx.URL("https://www.linkedin.com/dms-uploads/example/uploaded-video/1"):
+            assert request.method == "PUT"
+            assert request.headers["Authorization"] == "Bearer test-token"
+            assert request.headers["Content-Type"] == "application/octet-stream"
+            assert request.content == b"efgh"
+            return httpx.Response(201, headers={"ETag": '"etag-2"'})
+
+        if request.url == httpx.URL("https://api.linkedin.com/rest/videos?action=finalizeUpload"):
+            payload = json.loads(request.content.decode("utf-8"))
+            assert payload == {
+                "finalizeUploadRequest": {
+                    "video": "urn:li:video:123",
+                    "uploadToken": "upload-token",
+                    "uploadedPartIds": ["etag-1", "etag-2"],
+                }
+            }
+            return httpx.Response(200, json={})
+
+        if request.url == httpx.URL("https://api.linkedin.com/rest/videos/urn%3Ali%3Avideo%3A123"):
+            status_polls += 1
+            if status_polls == 1:
+                return httpx.Response(200, json={"id": "urn:li:video:123", "status": "PROCESSING"})
+            return httpx.Response(200, json={"id": "urn:li:video:123", "status": "AVAILABLE"})
+
+        if request.url == httpx.URL("https://api.linkedin.com/rest/posts"):
+            payload = json.loads(request.content.decode("utf-8"))
+            assert payload == {
+                "author": "urn:li:person:abc123",
+                "commentary": "Hello with video",
+                "visibility": "PUBLIC",
+                "distribution": {
+                    "feedDistribution": "MAIN_FEED",
+                    "targetEntities": [],
+                    "thirdPartyDistributionChannels": [],
+                },
+                "content": {
+                    "media": {
+                        "id": "urn:li:video:123",
+                        "title": "Linus clip",
+                    }
+                },
+                "lifecycleState": "PUBLISHED",
+                "isReshareDisabledByAuthor": False,
+            }
+            return httpx.Response(
+                201,
+                headers={"x-restli-id": "urn:li:share:654"},
+                json={"id": "urn:li:share:654"},
+            )
+
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+        video_wait_interval=0.0,
+    )
+
+    result = client.create_video_post(
+        author="urn:li:person:abc123",
+        commentary="Hello with video",
+        video_path=video_path,
+        title="Linus clip",
+    )
+
+    assert result.post_id == "urn:li:share:654"
+    assert result.response["id"] == "urn:li:share:654"
+    assert [request.url for request in requests] == [
+        httpx.URL("https://api.linkedin.com/rest/videos?action=initializeUpload"),
+        httpx.URL("https://www.linkedin.com/dms-uploads/example/uploaded-video/0"),
+        httpx.URL("https://www.linkedin.com/dms-uploads/example/uploaded-video/1"),
+        httpx.URL("https://api.linkedin.com/rest/videos?action=finalizeUpload"),
+        httpx.URL("https://api.linkedin.com/rest/videos/urn%3Ali%3Avideo%3A123"),
+        httpx.URL("https://api.linkedin.com/rest/videos/urn%3Ali%3Avideo%3A123"),
+        httpx.URL("https://api.linkedin.com/rest/posts"),
+    ]
+
+
 def test_get_employment_history_uses_profile_api_projection() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "GET"

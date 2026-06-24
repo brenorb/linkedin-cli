@@ -9,7 +9,7 @@ It covers:
 3. exchanging an authorization code for a token
 4. deriving `LINKEDIN_AUTHOR_URN`
 5. saving local environment variables
-6. verifying text and image posts
+6. verifying text, image, and video posts
 
 Employment-data support is separate and more constrained:
 
@@ -269,6 +269,18 @@ uv run linkedin-cli post \
   "Hello from the LinkedIn Posts API"
 ```
 
+## 10. Post a video post
+
+```bash
+cd /Users/breno/Documents/code/PROJECTS/linkedin-cli
+source ~/.config/linkedin-cli/env.sh
+
+uv run linkedin-cli post \
+  --video /absolute/path/to/clip.mp4 \
+  --video-title "Linus on abstraction" \
+  "Hello from the LinkedIn Posts API"
+```
+
 ## Troubleshooting
 
 ### `invalid_request` during token exchange
@@ -341,5 +353,6 @@ then your local env file still has an invalid or stale version. Update `~/.confi
 
 - [Getting access to LinkedIn APIs](https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access)
 - [Sign In with LinkedIn](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin)
-- [Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-05)
+- [Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-06)
+- [Videos API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/videos-api?view=li-lms-2026-06)
 - [URNs and IDs](https://learn.microsoft.com/en-us/linkedin/shared/api-guide/concepts/urns?context=linkedin%2Fcontext)

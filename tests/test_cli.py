@@ -107,6 +107,70 @@ def test_cli_post_with_image_uses_image_flow(
     assert "urn:li:share:456" in stdout
 
 
+def test_cli_post_with_video_uses_video_flow(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    video_path = tmp_path / "clip.mp4"
+    video_path.write_bytes(b"fake-mp4")
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def create_text_post(self, *, author: str, commentary: str, visibility: str) -> object:
+            raise AssertionError("text flow should not be used when --video is provided")
+
+        def create_video_post(
+            self,
+            *,
+            author: str,
+            commentary: str,
+            visibility: str,
+            video_path: Path,
+            title: str | None = None,
+        ) -> object:
+            captured["author"] = author
+            captured["commentary"] = commentary
+            captured["visibility"] = visibility
+            captured["video_path"] = video_path
+            captured["title"] = title
+            return type("Result", (), {"post_id": "urn:li:share:789"})()
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        [
+            "post",
+            "--video",
+            str(video_path),
+            "--video-title",
+            "Linus on abstraction",
+            "Ship",
+            "it",
+        ],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "author": "urn:li:person:env123",
+        "commentary": "Ship it",
+        "visibility": "PUBLIC",
+        "video_path": video_path,
+        "title": "Linus on abstraction",
+    }
+    assert "urn:li:share:789" in stdout
+
+
 def test_cli_post_rejects_alt_text_without_image(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(
         ["post", "--alt-text", "Bitdevs banner", "Hello"],
@@ -121,6 +185,22 @@ def test_cli_post_rejects_alt_text_without_image(capsys: pytest.CaptureFixture[s
     assert exit_code == 2
     assert "alt text" in stderr.lower()
     assert "image" in stderr.lower()
+
+
+def test_cli_post_rejects_image_and_video_together(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = main(
+        ["post", "--image", "/tmp/banner.png", "--video", "/tmp/clip.mp4", "Hello"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "image" in stderr.lower()
+    assert "video" in stderr.lower()
 
 
 def test_cli_post_requires_author_and_access_token(capsys: pytest.CaptureFixture[str]) -> None:

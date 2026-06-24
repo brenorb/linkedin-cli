@@ -8,6 +8,7 @@ This project is intentionally narrow:
 
 - publish a text post as a member or organization
 - publish an image post as a member or organization
+- publish a video post as a member or organization
 - read employment data from official LinkedIn profile APIs when your app tier and scopes allow it
 - use the current LinkedIn `Posts API`
 - stay easy to read and easy to fork
@@ -43,6 +44,15 @@ Publish a post with an image:
 uv run linkedin-cli post \
   --image /absolute/path/to/banner.png \
   --alt-text "Bitdevs BSB event banner" \
+  "Hello from the new Posts API"
+```
+
+Publish a post with a video:
+
+```bash
+uv run linkedin-cli post \
+  --video /absolute/path/to/clip.mp4 \
+  --video-title "Linus on abstraction" \
   "Hello from the new Posts API"
 ```
 
@@ -89,6 +99,8 @@ According to the official LinkedIn docs, posting on behalf of a member requires:
 
 For image posts, this project uses LinkedIn's Images API to initialize an upload, uploads the binary to the returned `uploadUrl`, and then creates the post with the returned `urn:li:image:...`.
 
+For video posts, this project uses LinkedIn's Videos API to initialize the upload, uploads each instructed part, finalizes the upload, waits for the asset to become `AVAILABLE`, and then creates the post with the returned `urn:li:video:...`.
+
 For employment data, the official API surface is constrained:
 
 - `GET /rest/identityMe` can return only the member's current position, and only on the Plus tier with the `r_primary_current_experience` scope.
@@ -99,7 +111,8 @@ Official docs:
 
 - [Getting access to LinkedIn APIs](https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access)
 - [Sign In with LinkedIn](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin)
-- [Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-05)
+- [Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-06)
+- [Videos API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/videos-api?view=li-lms-2026-06)
 - [Profile API](https://learn.microsoft.com/en-us/linkedin/shared/integrations/people/profile-api)
 - [Full Profile Fields](https://learn.microsoft.com/en-us/linkedin/shared/references/v2/profile/full-profile)
 - [Profile Details API (`/identityMe`)](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/verified-on-linkedin/api-reference/identity-me)
