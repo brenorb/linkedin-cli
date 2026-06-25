@@ -1,29 +1,20 @@
-# PyPI trusted publishing
+# PyPI publishing
 
-This repository is wired to publish `licli` to PyPI directly from GitHub Actions.
+This repository is wired to publish `licli` to PyPI directly from GitHub Actions using a stored PyPI API token.
 
 The GitHub-side workflow is:
 
 - workflow file: `.github/workflows/release.yml`
 - job: `publish-pypi`
-- permissions: `id-token: write`
-- environment: `pypi`
+- secret: `PYPI_API_TOKEN`
 
-## One-time PyPI setup
+## One-time GitHub setup
 
-Before the workflow can publish, PyPI needs a trusted publisher entry that matches:
-
-- PyPI project name: `licli`
-- owner: `brenorb`
-- repository: `linkedin-cli`
-- workflow: `.github/workflows/release.yml`
-- environment: `pypi`
-
-For a brand-new project, create a pending trusted publisher for `licli` in PyPI before pushing the first release tag.
+Before the workflow can publish, GitHub needs a repository secret named `PYPI_API_TOKEN` whose value is a PyPI API token that can upload `licli`.
 
 ## Release flow
 
-After the trusted publisher exists, publishing is:
+After the secret exists, publishing is:
 
 1. push a semver tag like `v0.1.0`
 2. let GitHub Actions run `.github/workflows/release.yml`
