@@ -20,22 +20,27 @@ Employment-data support is separate and more constrained:
 Post-management support also splits along member versus organization and read versus write permissions:
 
 - `post` and `post create` use the official Posts API create flow.
+- `post edit` uses LinkedIn's official Rest.li partial-update flow.
 - `post delete` uses the official `DELETE /rest/posts/{encodedPostUrn}` flow.
-- `post get` and `post list` use the official read surface on `/rest/posts`, which has stricter permissions than write.
+- `post get`, `post batch-get`, and `post list` use the official read surface on `/rest/posts`, which has stricter permissions than write.
 
 ## Command matrix
 
 | Command | Works for member URNs | Works for organization URNs | Required scope family |
 | --- | --- | --- | --- |
 | `licli post ...` / `licli post create ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `licli post edit <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
 | `licli post delete <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
 | `licli post get <post-urn>` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
+| `licli post batch-get <post-urn>...` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
 | `licli post list [--author ...]` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
 
 Notes:
 
 - `LINKEDIN_AUTHOR_URN` is used by `post create` and `post list`. It can be either `urn:li:person:...` or `urn:li:organization:...`.
 - `post get` and `post delete` only need the post URN plus a valid access token and API version.
+- `post edit` supports commentary plus the content CTA fields exposed by LinkedIn's partial-update surface.
+- `post batch-get` is the supported multi-read surface for posts. `post list` remains the `q=author` finder and LinkedIn documents `100` as its max count.
 - It is normal for `post create` to work while `post get` or `post list` return `403`, because LinkedIn treats read scopes as more restricted than write scopes.
 - If your post text starts with `create`, `get`, `list`, or `delete`, use `licli post create "..."` to avoid ambiguity.
 
@@ -88,7 +93,7 @@ export LINKEDIN_CLIENT_ID='YOUR_CLIENT_ID'
 export LINKEDIN_CLIENT_SECRET='YOUR_CLIENT_SECRET'
 export LINKEDIN_REDIRECT_URI='http://localhost:8000/callback'
 export LINKEDIN_SCOPE='w_member_social openid profile email'
-export LINKEDIN_API_VERSION='202604'
+export LINKEDIN_API_VERSION='202606'
 EOF
 
 chmod 600 ~/.config/licli/env.sh

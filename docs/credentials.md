@@ -27,7 +27,7 @@ export LINKEDIN_ACCESS_TOKEN=''
 export LINKEDIN_AUTHOR_URN=''
 
 # Must be YYYYMM, not YYYYMMDD.
-export LINKEDIN_API_VERSION='202604'
+export LINKEDIN_API_VERSION='202606'
 EOF
 
 chmod 600 ~/.config/licli/env.sh

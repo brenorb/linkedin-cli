@@ -43,16 +43,31 @@ class LinkedInPostClient(Protocol):
         sort_by: str,
         view_context: str | None = None,
     ) -> dict[str, Any]: ...
+    def batch_get_posts(
+        self,
+        post_urns: list[str],
+        *,
+        view_context: str | None = None,
+    ) -> dict[str, Any]: ...
     def delete_post(self, post_urn: str) -> None: ...
+    def update_post(
+        self,
+        post_urn: str,
+        *,
+        commentary: str | None = None,
+        content_call_to_action_label: str | None = None,
+        content_landing_page: str | None = None,
+    ) -> None: ...
     def get_employment_history(self) -> list[dict[str, object]]: ...
     def get_current_employment(self) -> list[dict[str, object]]: ...
 
 
 ClientFactory = Callable[..., object]
 
-POST_ACTIONS = {"create", "get", "list", "delete"}
+POST_ACTIONS = {"create", "get", "list", "delete", "edit", "batch-get"}
 POST_VIEW_CONTEXTS = ("AUTHOR", "READER")
 POST_SORT_OPTIONS = ("LAST_MODIFIED", "CREATED")
+POST_LIST_MAX_COUNT = 100
 
 
 def build_parser(*, explicit_post_actions: bool = False) -> argparse.ArgumentParser:
@@ -91,11 +106,30 @@ def build_parser(*, explicit_post_actions: bool = False) -> argparse.ArgumentPar
         _add_view_context_argument(list_parser)
         list_parser.set_defaults(post_command="list")
 
+        batch_get_parser = post_subparsers.add_parser(
+            "batch-get",
+            help="Read multiple posts by URN",
+        )
+        batch_get_parser.add_argument("post_urns", nargs="+", help="One or more post URNs")
+        _add_access_token_argument(batch_get_parser)
+        _add_api_version_argument(batch_get_parser)
+        _add_view_context_argument(batch_get_parser)
+        batch_get_parser.set_defaults(post_command="batch-get")
+
         delete_parser = post_subparsers.add_parser("delete", help="Delete a post by URN")
         delete_parser.add_argument("post_urn", help="Post URN, for example urn:li:share:123")
         _add_access_token_argument(delete_parser)
         _add_api_version_argument(delete_parser)
         delete_parser.set_defaults(post_command="delete")
+
+        edit_parser = post_subparsers.add_parser("edit", help="Partially update a post")
+        edit_parser.add_argument("post_urn", help="Post URN, for example urn:li:share:123")
+        _add_access_token_argument(edit_parser)
+        _add_api_version_argument(edit_parser)
+        edit_parser.add_argument("--text", dest="edited_commentary", help="Replacement post text")
+        edit_parser.add_argument("--cta-label", help="Content call-to-action label")
+        edit_parser.add_argument("--landing-page", help="Landing page URL for the content CTA")
+        edit_parser.set_defaults(post_command="edit")
     else:
         _add_post_create_arguments(post_parser)
         post_parser.set_defaults(post_command="create")
@@ -170,6 +204,17 @@ def _run_post(
         print("Missing required configuration: choose either an image or a video, not both.", file=sys.stderr)
         return 2
 
+    if post_command == "list" and args.count > POST_LIST_MAX_COUNT:
+        print(
+            f"Missing required configuration: count must be <= {POST_LIST_MAX_COUNT}.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if post_command == "edit" and not _post_edit_has_changes(args):
+        print("Missing required configuration: provide at least one editable field.", file=sys.stderr)
+        return 2
+
     client = cast(
         LinkedInPostClient,
         client_factory(access_token=access_token, api_version=resolved_api_version),
@@ -202,9 +247,24 @@ def _run_post(
             print(json.dumps(result, indent=2))
             return 0
 
+        if post_command == "batch-get":
+            result = client.batch_get_posts(args.post_urns, view_context=args.view_context)
+            print(json.dumps(result, indent=2))
+            return 0
+
         if post_command == "delete":
             client.delete_post(args.post_urn)
             print(f"Deleted post {args.post_urn}")
+            return 0
+
+        if post_command == "edit":
+            client.update_post(
+                args.post_urn,
+                commentary=args.edited_commentary,
+                content_call_to_action_label=args.cta_label,
+                content_landing_page=args.landing_page,
+            )
+            print(f"Updated post {args.post_urn}")
             return 0
 
         raise AssertionError(f"Unsupported post command: {post_command}")
@@ -286,6 +346,16 @@ def _uses_explicit_post_action(argv: Sequence[str]) -> bool:
 
 def _post_requires_author(post_command: str) -> bool:
     return post_command in {"create", "list"}
+
+
+def _post_edit_has_changes(args: argparse.Namespace) -> bool:
+    return any(
+        (
+            getattr(args, "edited_commentary", None),
+            getattr(args, "cta_label", None),
+            getattr(args, "landing_page", None),
+        )
+    )
 
 
 def _configured_value(cli_value: str | None, env_value: str | None) -> str | None:

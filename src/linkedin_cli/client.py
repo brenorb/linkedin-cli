@@ -11,7 +11,7 @@ import httpx
 
 from linkedin_cli.employment import normalize_current_position, normalize_positions_payload
 
-DEFAULT_API_VERSION = "202505"
+DEFAULT_API_VERSION = "202606"
 
 
 class LinkedInApiError(RuntimeError):
@@ -135,11 +135,56 @@ class LinkedInClient:
 
         return _response_json(response)
 
+    def batch_get_posts(
+        self,
+        post_urns: list[str],
+        *,
+        view_context: str | None = None,
+    ) -> dict[str, Any]:
+        encoded_post_urns = ",".join(quote(post_urn, safe="") for post_urn in post_urns)
+        path = f"/rest/posts?ids=List({encoded_post_urns})"
+        if view_context:
+            path = f"{path}&viewContext={view_context}"
+
+        response = self._client.get(
+            path,
+            headers={"X-RestLi-Method": "BATCH_GET"},
+        )
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+        return _response_json(response)
+
     def delete_post(self, post_urn: str) -> None:
         encoded_post_urn = quote(post_urn, safe="")
         response = self._client.delete(
             f"/rest/posts/{encoded_post_urn}",
             headers={"X-RestLi-Method": "DELETE"},
+        )
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+    def update_post(
+        self,
+        post_urn: str,
+        *,
+        commentary: str | None = None,
+        content_call_to_action_label: str | None = None,
+        content_landing_page: str | None = None,
+    ) -> None:
+        encoded_post_urn = quote(post_urn, safe="")
+        patch_set: dict[str, str] = {}
+        if commentary is not None:
+            patch_set["commentary"] = commentary
+        if content_call_to_action_label is not None:
+            patch_set["contentCallToActionLabel"] = content_call_to_action_label
+        if content_landing_page is not None:
+            patch_set["contentLandingPage"] = content_landing_page
+
+        response = self._client.post(
+            f"/rest/posts/{encoded_post_urn}",
+            headers={"X-RestLi-Method": "PARTIAL_UPDATE"},
+            json={"patch": {"$set": patch_set}},
         )
         if response.is_error:
             raise LinkedInApiError(response.status_code, _extract_error_message(response))

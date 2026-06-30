@@ -290,6 +290,55 @@ def test_cli_post_get_reads_access_token_and_prints_json(
     assert '"Hello from tests"' in stdout
 
 
+def test_cli_post_batch_get_reads_access_token_and_prints_json(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def batch_get_posts(
+            self,
+            post_urns: list[str],
+            *,
+            view_context: str | None = None,
+        ) -> dict[str, object]:
+            captured["post_urns"] = post_urns
+            captured["view_context"] = view_context
+            return {
+                "results": {
+                    "urn:li:share:123": {"id": "urn:li:share:123"},
+                    "urn:li:share:456": {"id": "urn:li:share:456"},
+                },
+                "statuses": {},
+                "errors": {},
+            }
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["post", "batch-get", "urn:li:share:123", "urn:li:share:456", "--view-context", "AUTHOR"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "post_urns": ["urn:li:share:123", "urn:li:share:456"],
+        "view_context": "AUTHOR",
+    }
+    assert '"urn:li:share:123"' in stdout
+    assert '"urn:li:share:456"' in stdout
+
+
 def test_cli_post_list_reads_author_from_environment(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -350,6 +399,24 @@ def test_cli_post_list_reads_author_from_environment(
     assert '"urn:li:share:987"' in stdout
 
 
+def test_cli_post_list_rejects_count_above_linkedin_limit(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main(
+        ["post", "list", "--count", "101"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "count" in stderr.lower()
+    assert "100" in stderr
+
+
 def test_cli_post_list_requires_author(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(
         ["post", "list"],
@@ -395,6 +462,78 @@ def test_cli_post_delete_reads_access_token_and_deletes_post(
         "post_urn": "urn:li:share:987",
     }
     assert "Deleted post urn:li:share:987" in stdout
+
+
+def test_cli_post_edit_updates_post(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def update_post(
+            self,
+            post_urn: str,
+            *,
+            commentary: str | None = None,
+            content_call_to_action_label: str | None = None,
+            content_landing_page: str | None = None,
+        ) -> None:
+            captured["post_urn"] = post_urn
+            captured["commentary"] = commentary
+            captured["content_call_to_action_label"] = content_call_to_action_label
+            captured["content_landing_page"] = content_landing_page
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        [
+            "post",
+            "edit",
+            "urn:li:share:987",
+            "--text",
+            "Edited text",
+            "--cta-label",
+            "LEARN_MORE",
+            "--landing-page",
+            "https://example.com",
+        ],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "post_urn": "urn:li:share:987",
+        "commentary": "Edited text",
+        "content_call_to_action_label": "LEARN_MORE",
+        "content_landing_page": "https://example.com",
+    }
+    assert "Updated post urn:li:share:987" in stdout
+
+
+def test_cli_post_edit_requires_at_least_one_change(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main(
+        ["post", "edit", "urn:li:share:987"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "at least one" in stderr.lower()
 
 
 def test_cli_profile_employment_history_reads_positions_from_profile_api(

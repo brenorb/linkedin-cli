@@ -91,6 +91,21 @@ Read a post by URN:
 uv run licli post get "urn:li:share:123456789"
 ```
 
+Read multiple posts by URN:
+
+```bash
+uv run licli post batch-get "urn:li:share:123456789" "urn:li:share:987654321"
+```
+
+Edit a post's text or content CTA:
+
+```bash
+uv run licli post edit "urn:li:share:123456789" \
+  --text "Edited text" \
+  --cta-label LEARN_MORE \
+  --landing-page "https://example.com"
+```
+
 Delete a post by URN:
 
 ```bash
@@ -134,13 +149,17 @@ Command support differs depending on whether you are acting as a member or an or
 | Command | Member author | Organization author | Scope notes |
 | --- | --- | --- | --- |
 | `post` / `post create` | Works with `w_member_social` | Works with `w_organization_social` | Organization posting also depends on the authenticated member being allowed to act for that organization. |
+| `post edit` | Works with `w_member_social` | Works with `w_organization_social` | Uses LinkedIn's Rest.li partial update flow. This CLI supports commentary and content CTA updates. |
 | `post delete` | Works with `w_member_social` | Works with `w_organization_social` | Same write scope family as create. |
 | `post get` | Works only if LinkedIn has granted restricted `r_member_social` | Works only if LinkedIn has granted `r_organization_social` | Self-serve apps often do not have member read access even when posting works. |
+| `post batch-get` | Works only if LinkedIn has granted restricted `r_member_social` | Works only if LinkedIn has granted `r_organization_social` | Uses Rest.li batch get on `/rest/posts`. |
 | `post list` | Works only if LinkedIn has granted restricted `r_member_social` and you provide a member author URN | Works only if LinkedIn has granted `r_organization_social` and you provide an organization author URN | Uses the official `q=author` finder on `/rest/posts`. |
 
 Practical consequence: create and delete can work while get and list still return `403` because the read scopes are more restricted than the write scopes.
 
 According to the official LinkedIn docs, member posting requires OAuth 2.0 member authentication, `w_member_social`, and a valid `Linkedin-Version` header in `YYYYMM` format. Organization posting and deletion use the same Posts API surface but switch to organization scopes.
+
+This CLI defaults `LINKEDIN_API_VERSION` to `202606`. If LinkedIn rotates active versions again, update that value or override it with the environment variable.
 
 For image posts, this project uses LinkedIn's Images API to initialize an upload, uploads the binary to the returned `uploadUrl`, and then creates the post with the returned `urn:li:image:...`.
 
