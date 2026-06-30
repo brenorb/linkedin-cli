@@ -49,7 +49,8 @@ Avoid storing tokens in tracked repo files.
 
 ## Notes
 
-- `LINKEDIN_AUTHOR_URN` should look like `urn:li:person:abc123`.
+- `LINKEDIN_AUTHOR_URN` can look like `urn:li:person:abc123` or `urn:li:organization:123456`, depending on whether `post create` or `post list` should act as a member or organization.
+- `post get` and `post delete` do not read `LINKEDIN_AUTHOR_URN`; they only need the post URN plus `LINKEDIN_ACCESS_TOKEN`.
 - `LINKEDIN_API_VERSION` must use `YYYYMM`.
 - A value such as `20250501` is invalid and will cause `426 Requested version ... is not active`.
 - Active versions change over time. If a version stops working, update it to a currently active `YYYYMM`.

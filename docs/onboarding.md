@@ -17,6 +17,28 @@ Employment-data support is separate and more constrained:
 - Current position on `identityMe` requires Plus tier and the `r_primary_current_experience` scope.
 - Multi-position history through the older Profile API depends on restricted access to `positions` under `r_fullprofile`, which LinkedIn documents as closed.
 
+Post-management support also splits along member versus organization and read versus write permissions:
+
+- `post` and `post create` use the official Posts API create flow.
+- `post delete` uses the official `DELETE /rest/posts/{encodedPostUrn}` flow.
+- `post get` and `post list` use the official read surface on `/rest/posts`, which has stricter permissions than write.
+
+## Command matrix
+
+| Command | Works for member URNs | Works for organization URNs | Required scope family |
+| --- | --- | --- | --- |
+| `licli post ...` / `licli post create ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `licli post delete <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `licli post get <post-urn>` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
+| `licli post list [--author ...]` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
+
+Notes:
+
+- `LINKEDIN_AUTHOR_URN` is used by `post create` and `post list`. It can be either `urn:li:person:...` or `urn:li:organization:...`.
+- `post get` and `post delete` only need the post URN plus a valid access token and API version.
+- It is normal for `post create` to work while `post get` or `post list` return `403`, because LinkedIn treats read scopes as more restricted than write scopes.
+- If your post text starts with `create`, `get`, `list`, or `delete`, use `licli post create "..."` to avoid ambiguity.
+
 ## Prerequisites
 
 - a LinkedIn account
@@ -72,6 +94,15 @@ EOF
 chmod 600 ~/.config/licli/env.sh
 source ~/.config/licli/env.sh
 ```
+
+If you are preparing an organization-author flow, request the organization scopes that your app has actually been approved for. The common split is:
+
+- member create/delete: `w_member_social`
+- organization create/delete: `w_organization_social`
+- member get/list: restricted `r_member_social`
+- organization get/list: `r_organization_social`
+
+Do not assume you can simply add the read scopes to a self-serve app; LinkedIn may not grant them.
 
 ## 3. Generate the authorization URL
 
@@ -201,6 +232,16 @@ PY
 printf "export LINKEDIN_AUTHOR_URN='urn:li:person:%s'\n" "$LINKEDIN_PERSON_ID" >> ~/.config/licli/env.sh
 source ~/.config/licli/env.sh
 ```
+
+### Organization author URNs
+
+For `post create` and `post list`, you can also set:
+
+```bash
+export LINKEDIN_AUTHOR_URN='urn:li:organization:123456'
+```
+
+Use this only when the access token is authorized to act on behalf of that organization.
 
 ### Fallback path: use `id_token`
 
