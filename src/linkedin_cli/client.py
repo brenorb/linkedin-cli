@@ -94,6 +94,56 @@ class LinkedInClient:
         post_id = response.headers.get("x-restli-id") or body.get("id")
         return PostCreationResult(post_id=post_id, response=body)
 
+    def get_post(self, post_urn: str, *, view_context: str | None = None) -> dict[str, Any]:
+        encoded_post_urn = quote(post_urn, safe="")
+        params: list[tuple[str, str | int | float | None]] | None = None
+        if view_context:
+            params = [("viewContext", view_context)]
+
+        response = self._client.get(f"/rest/posts/{encoded_post_urn}", params=params)
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+        return _response_json(response)
+
+    def list_posts(
+        self,
+        *,
+        author: str,
+        count: int = 10,
+        start: int = 0,
+        sort_by: str = "LAST_MODIFIED",
+        view_context: str | None = None,
+    ) -> dict[str, Any]:
+        params: list[tuple[str, str | int | float | None]] = [
+            ("author", author),
+            ("q", "author"),
+            ("count", count),
+            ("start", start),
+            ("sortBy", sort_by),
+        ]
+        if view_context:
+            params.append(("viewContext", view_context))
+
+        response = self._client.get(
+            "/rest/posts",
+            params=params,
+            headers={"X-RestLi-Method": "FINDER"},
+        )
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+        return _response_json(response)
+
+    def delete_post(self, post_urn: str) -> None:
+        encoded_post_urn = quote(post_urn, safe="")
+        response = self._client.delete(
+            f"/rest/posts/{encoded_post_urn}",
+            headers={"X-RestLi-Method": "DELETE"},
+        )
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
     def get_employment_history(self) -> list[dict[str, object]]:
         response = self._client.get("/v2/me", params={"projection": "(positions)"})
         if response.is_error:

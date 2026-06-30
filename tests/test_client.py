@@ -49,6 +49,95 @@ def test_create_text_post_uses_rest_posts_api() -> None:
     assert result.response["id"] == "urn:li:share:987"
 
 
+def test_get_post_uses_rest_posts_api() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == httpx.URL(
+            "https://api.linkedin.com/rest/posts/urn%3Ali%3Ashare%3A987?viewContext=AUTHOR"
+        )
+        assert request.headers["Authorization"] == "Bearer test-token"
+        assert request.headers["Linkedin-Version"] == "202505"
+        return httpx.Response(
+            200,
+            json={
+                "id": "urn:li:share:987",
+                "author": "urn:li:person:abc123",
+                "commentary": "Hello from tests",
+            },
+        )
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.get_post("urn:li:share:987", view_context="AUTHOR")
+
+    assert result["id"] == "urn:li:share:987"
+    assert result["commentary"] == "Hello from tests"
+
+
+def test_list_posts_uses_author_finder() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == httpx.URL(
+            "https://api.linkedin.com/rest/posts"
+            "?author=urn%3Ali%3Aperson%3Aabc123&q=author&count=25&start=5&sortBy=CREATED&viewContext=AUTHOR"
+        )
+        assert request.headers["Authorization"] == "Bearer test-token"
+        assert request.headers["Linkedin-Version"] == "202505"
+        assert request.headers["X-RestLi-Method"] == "FINDER"
+        return httpx.Response(
+            200,
+            json={
+                "paging": {"start": 5, "count": 25, "links": []},
+                "elements": [
+                    {
+                        "id": "urn:li:share:987",
+                        "author": "urn:li:person:abc123",
+                        "commentary": "Newest first",
+                    }
+                ],
+            },
+        )
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.list_posts(
+        author="urn:li:person:abc123",
+        count=25,
+        start=5,
+        sort_by="CREATED",
+        view_context="AUTHOR",
+    )
+
+    assert result["paging"]["start"] == 5
+    assert result["elements"][0]["id"] == "urn:li:share:987"
+
+
+def test_delete_post_uses_rest_posts_api() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "DELETE"
+        assert request.url == httpx.URL("https://api.linkedin.com/rest/posts/urn%3Ali%3Ashare%3A987")
+        assert request.headers["Authorization"] == "Bearer test-token"
+        assert request.headers["Linkedin-Version"] == "202505"
+        assert request.headers["X-RestLi-Method"] == "DELETE"
+        return httpx.Response(204)
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    client.delete_post("urn:li:share:987")
+
+
 def test_create_text_post_raises_clear_error_on_api_failure() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={"message": "Invalid access token"})

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 
 def normalize_positions_payload(payload: dict[str, Any]) -> list[dict[str, object]]:
@@ -41,7 +42,7 @@ def normalize_current_position(payload: dict[str, Any]) -> list[dict[str, object
 
 
 def filter_employment_history(
-    records: list[dict[str, object]],
+    records: Sequence[Mapping[str, object]],
     *,
     years: int,
     today: date | None = None,
@@ -59,21 +60,21 @@ def filter_employment_history(
         if start is None:
             continue
         if end >= cutoff:
-            filtered.append(record)
+            filtered.append(dict(record))
 
     return filtered
 
 
 def _position_items(positions: object) -> list[dict[str, Any]]:
     if isinstance(positions, list):
-        return [item for item in positions if isinstance(item, dict)]
+        return [cast(dict[str, Any], item) for item in positions if isinstance(item, dict)]
     if not isinstance(positions, dict):
         return []
 
     for key in ("elements", "values"):
         items = positions.get(key)
         if isinstance(items, list):
-            return [item for item in items if isinstance(item, dict)]
+            return [cast(dict[str, Any], item) for item in items if isinstance(item, dict)]
 
     return []
 

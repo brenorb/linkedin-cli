@@ -43,6 +43,43 @@ def test_cli_post_reads_required_values_from_environment(capsys: pytest.CaptureF
     assert "urn:li:share:123" in stdout
 
 
+def test_cli_post_create_alias_uses_create_flow(capsys: pytest.CaptureFixture[str]) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def create_text_post(self, *, author: str, commentary: str, visibility: str) -> object:
+            captured["author"] = author
+            captured["commentary"] = commentary
+            captured["visibility"] = visibility
+            return type("Result", (), {"post_id": "urn:li:share:123"})()
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["post", "create", "Ship", "it"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "author": "urn:li:person:env123",
+        "commentary": "Ship it",
+        "visibility": "PUBLIC",
+    }
+    assert "urn:li:share:123" in stdout
+
+
 def test_cli_post_with_image_uses_image_flow(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -210,6 +247,154 @@ def test_cli_post_requires_author_and_access_token(capsys: pytest.CaptureFixture
     assert exit_code == 2
     assert "access token" in stderr.lower()
     assert "author urn" in stderr.lower()
+
+
+def test_cli_post_get_reads_access_token_and_prints_json(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_post(self, post_urn: str, *, view_context: str | None = None) -> dict[str, object]:
+            captured["post_urn"] = post_urn
+            captured["view_context"] = view_context
+            return {
+                "id": "urn:li:share:987",
+                "author": "urn:li:person:env123",
+                "commentary": "Hello from tests",
+            }
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["post", "get", "urn:li:share:987", "--view-context", "AUTHOR"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "post_urn": "urn:li:share:987",
+        "view_context": "AUTHOR",
+    }
+    assert '"urn:li:share:987"' in stdout
+    assert '"Hello from tests"' in stdout
+
+
+def test_cli_post_list_reads_author_from_environment(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def list_posts(
+            self,
+            *,
+            author: str,
+            count: int,
+            start: int,
+            sort_by: str,
+            view_context: str | None = None,
+        ) -> dict[str, object]:
+            captured["author"] = author
+            captured["count"] = count
+            captured["start"] = start
+            captured["sort_by"] = sort_by
+            captured["view_context"] = view_context
+            return {
+                "paging": {"start": 0, "count": 10, "links": []},
+                "elements": [
+                    {
+                        "id": "urn:li:share:987",
+                        "author": author,
+                        "commentary": "Hello from tests",
+                    }
+                ],
+            }
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["post", "list"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "author": "urn:li:person:env123",
+        "count": 10,
+        "start": 0,
+        "sort_by": "LAST_MODIFIED",
+        "view_context": None,
+    }
+    assert '"urn:li:share:987"' in stdout
+
+
+def test_cli_post_list_requires_author(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = main(
+        ["post", "list"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "author urn" in stderr.lower()
+
+
+def test_cli_post_delete_reads_access_token_and_deletes_post(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def delete_post(self, post_urn: str) -> None:
+            captured["post_urn"] = post_urn
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["post", "delete", "urn:li:share:987"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "post_urn": "urn:li:share:987",
+    }
+    assert "Deleted post urn:li:share:987" in stdout
 
 
 def test_cli_profile_employment_history_reads_positions_from_profile_api(
