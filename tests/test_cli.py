@@ -144,6 +144,65 @@ def test_cli_post_with_image_uses_image_flow(
     assert "urn:li:share:456" in stdout
 
 
+def test_cli_post_with_image_urn_reuses_existing_asset(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def create_image_post_from_asset(
+            self,
+            *,
+            author: str,
+            commentary: str,
+            visibility: str,
+            image_urn: str,
+            alt_text: str | None = None,
+        ) -> object:
+            captured["author"] = author
+            captured["commentary"] = commentary
+            captured["visibility"] = visibility
+            captured["image_urn"] = image_urn
+            captured["alt_text"] = alt_text
+            return type("Result", (), {"post_id": "urn:li:share:456"})()
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        [
+            "post",
+            "--image-urn",
+            "urn:li:image:123",
+            "--alt-text",
+            "Bitdevs banner",
+            "Ship",
+            "it",
+        ],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "author": "urn:li:person:env123",
+        "commentary": "Ship it",
+        "visibility": "PUBLIC",
+        "image_urn": "urn:li:image:123",
+        "alt_text": "Bitdevs banner",
+    }
+    assert "urn:li:share:456" in stdout
+
+
 def test_cli_post_with_video_uses_video_flow(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -208,6 +267,65 @@ def test_cli_post_with_video_uses_video_flow(
     assert "urn:li:share:789" in stdout
 
 
+def test_cli_post_with_video_urn_reuses_existing_asset(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def create_video_post_from_asset(
+            self,
+            *,
+            author: str,
+            commentary: str,
+            visibility: str,
+            video_urn: str,
+            title: str | None = None,
+        ) -> object:
+            captured["author"] = author
+            captured["commentary"] = commentary
+            captured["visibility"] = visibility
+            captured["video_urn"] = video_urn
+            captured["title"] = title
+            return type("Result", (), {"post_id": "urn:li:share:789"})()
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        [
+            "post",
+            "--video-urn",
+            "urn:li:video:123",
+            "--video-title",
+            "Linus on abstraction",
+            "Ship",
+            "it",
+        ],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "author": "urn:li:person:env123",
+        "commentary": "Ship it",
+        "visibility": "PUBLIC",
+        "video_urn": "urn:li:video:123",
+        "title": "Linus on abstraction",
+    }
+    assert "urn:li:share:789" in stdout
+
+
 def test_cli_post_rejects_alt_text_without_image(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(
         ["post", "--alt-text", "Bitdevs banner", "Hello"],
@@ -238,6 +356,24 @@ def test_cli_post_rejects_image_and_video_together(capsys: pytest.CaptureFixture
     assert exit_code == 2
     assert "image" in stderr.lower()
     assert "video" in stderr.lower()
+
+
+def test_cli_post_rejects_image_path_and_image_urn_together(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main(
+        ["post", "--image", "/tmp/banner.png", "--image-urn", "urn:li:image:123", "Hello"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "image" in stderr.lower()
+    assert "urn" in stderr.lower()
 
 
 def test_cli_post_requires_author_and_access_token(capsys: pytest.CaptureFixture[str]) -> None:
@@ -534,6 +670,176 @@ def test_cli_post_edit_requires_at_least_one_change(
     stderr = capsys.readouterr().err
     assert exit_code == 2
     assert "at least one" in stderr.lower()
+
+
+def test_cli_image_get_reads_access_token_and_prints_json(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_image(self, image_urn: str) -> dict[str, object]:
+            captured["image_urn"] = image_urn
+            return {"id": image_urn, "status": "AVAILABLE"}
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["image", "get", "urn:li:image:123"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "image_urn": "urn:li:image:123",
+    }
+    assert '"urn:li:image:123"' in stdout
+
+
+def test_cli_image_list_batch_gets_assets(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def batch_get_images(self, image_urns: list[str]) -> dict[str, object]:
+            captured["image_urns"] = image_urns
+            return {"results": {image_urns[0]: {"id": image_urns[0]}}}
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["image", "list", "--id", "urn:li:image:123", "--id", "urn:li:image:456"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "image_urns": ["urn:li:image:123", "urn:li:image:456"],
+    }
+    assert '"urn:li:image:123"' in stdout
+
+
+def test_cli_video_get_reads_access_token_and_prints_json(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_video(self, video_urn: str) -> dict[str, object]:
+            captured["video_urn"] = video_urn
+            return {"id": video_urn, "status": "AVAILABLE"}
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["video", "get", "urn:li:video:123"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "video_urn": "urn:li:video:123",
+    }
+    assert '"urn:li:video:123"' in stdout
+
+
+def test_cli_video_list_batch_gets_assets(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def batch_get_videos(self, video_urns: list[str]) -> dict[str, object]:
+            captured["video_urns"] = video_urns
+            return {"results": {video_urns[0]: {"id": video_urns[0]}}}
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["video", "list", "--id", "urn:li:video:123", "--id", "urn:li:video:456"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "video_urns": ["urn:li:video:123", "urn:li:video:456"],
+    }
+    assert '"urn:li:video:123"' in stdout
+
+
+def test_cli_profile_whoami_uses_userinfo_by_default(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_userinfo(self) -> dict[str, object]:
+            captured["called"] = "userinfo"
+            return {"sub": "abc123", "name": "Breno Brito"}
+
+    def client_factory(*, access_token: str, api_version: str) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        return StubClient()
+
+    exit_code = main(
+        ["profile", "whoami"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_API_VERSION": "202505",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202505",
+        "called": "userinfo",
+    }
+    assert '"person_urn": "urn:li:person:abc123"' in stdout
 
 
 def test_cli_profile_employment_history_reads_positions_from_profile_api(

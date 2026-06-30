@@ -230,6 +230,217 @@ def test_update_post_uses_restli_partial_update() -> None:
     )
 
 
+def test_get_image_uses_rest_images_api() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == httpx.URL("https://api.linkedin.com/rest/images/urn%3Ali%3Aimage%3A123")
+        assert request.headers["Authorization"] == "Bearer test-token"
+        assert request.headers["Linkedin-Version"] == "202505"
+        return httpx.Response(200, json={"id": "urn:li:image:123", "status": "AVAILABLE"})
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.get_image("urn:li:image:123")
+
+    assert result["id"] == "urn:li:image:123"
+
+
+def test_batch_get_images_uses_restli_batch_get() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == httpx.URL(
+            "https://api.linkedin.com/rest/images"
+            "?ids=List(urn%3Ali%3Aimage%3A123,urn%3Ali%3Aimage%3A456)"
+        )
+        assert request.headers["X-RestLi-Method"] == "BATCH_GET"
+        return httpx.Response(
+            200,
+            json={
+                "results": {
+                    "urn:li:image:123": {"id": "urn:li:image:123"},
+                    "urn:li:image:456": {"id": "urn:li:image:456"},
+                }
+            },
+        )
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.batch_get_images(["urn:li:image:123", "urn:li:image:456"])
+
+    assert result["results"]["urn:li:image:456"]["id"] == "urn:li:image:456"
+
+
+def test_get_video_uses_rest_videos_api() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == httpx.URL("https://api.linkedin.com/rest/videos/urn%3Ali%3Avideo%3A123")
+        assert request.headers["Authorization"] == "Bearer test-token"
+        assert request.headers["Linkedin-Version"] == "202505"
+        return httpx.Response(200, json={"id": "urn:li:video:123", "status": "AVAILABLE"})
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.get_video("urn:li:video:123")
+
+    assert result["id"] == "urn:li:video:123"
+
+
+def test_batch_get_videos_uses_restli_batch_get() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == httpx.URL(
+            "https://api.linkedin.com/rest/videos"
+            "?ids=List(urn%3Ali%3Avideo%3A123,urn%3Ali%3Avideo%3A456)"
+        )
+        assert request.headers["X-RestLi-Method"] == "BATCH_GET"
+        return httpx.Response(
+            200,
+            json={
+                "results": {
+                    "urn:li:video:123": {"id": "urn:li:video:123"},
+                    "urn:li:video:456": {"id": "urn:li:video:456"},
+                }
+            },
+        )
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.batch_get_videos(["urn:li:video:123", "urn:li:video:456"])
+
+    assert result["results"]["urn:li:video:123"]["id"] == "urn:li:video:123"
+
+
+def test_create_image_post_from_existing_asset_uses_media_urn() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url == httpx.URL("https://api.linkedin.com/rest/posts")
+        payload = json.loads(request.content.decode("utf-8"))
+        assert payload == {
+            "author": "urn:li:person:abc123",
+            "commentary": "Hello with reused image",
+            "visibility": "PUBLIC",
+            "distribution": {
+                "feedDistribution": "MAIN_FEED",
+                "targetEntities": [],
+                "thirdPartyDistributionChannels": [],
+            },
+            "content": {
+                "media": {
+                    "id": "urn:li:image:123",
+                    "altText": "Bitdevs banner",
+                }
+            },
+            "lifecycleState": "PUBLISHED",
+            "isReshareDisabledByAuthor": False,
+        }
+        return httpx.Response(
+            201,
+            headers={"x-restli-id": "urn:li:share:456"},
+            json={"id": "urn:li:share:456"},
+        )
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.create_image_post_from_asset(
+        author="urn:li:person:abc123",
+        commentary="Hello with reused image",
+        image_urn="urn:li:image:123",
+        alt_text="Bitdevs banner",
+    )
+
+    assert result.post_id == "urn:li:share:456"
+
+
+def test_create_video_post_from_existing_asset_uses_media_urn() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url == httpx.URL("https://api.linkedin.com/rest/posts")
+        payload = json.loads(request.content.decode("utf-8"))
+        assert payload == {
+            "author": "urn:li:person:abc123",
+            "commentary": "Hello with reused video",
+            "visibility": "PUBLIC",
+            "distribution": {
+                "feedDistribution": "MAIN_FEED",
+                "targetEntities": [],
+                "thirdPartyDistributionChannels": [],
+            },
+            "content": {
+                "media": {
+                    "id": "urn:li:video:123",
+                    "title": "Linus clip",
+                }
+            },
+            "lifecycleState": "PUBLISHED",
+            "isReshareDisabledByAuthor": False,
+        }
+        return httpx.Response(
+            201,
+            headers={"x-restli-id": "urn:li:share:654"},
+            json={"id": "urn:li:share:654"},
+        )
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.create_video_post_from_asset(
+        author="urn:li:person:abc123",
+        commentary="Hello with reused video",
+        video_urn="urn:li:video:123",
+        title="Linus clip",
+    )
+
+    assert result.post_id == "urn:li:share:654"
+
+
+def test_get_userinfo_uses_linkedin_oidc_endpoint() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == httpx.URL("https://api.linkedin.com/v2/userinfo")
+        assert request.headers["Authorization"] == "Bearer test-token"
+        return httpx.Response(
+            200,
+            json={
+                "sub": "abc123",
+                "name": "Breno Brito",
+                "email": "breno@example.com",
+            },
+        )
+
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.get_userinfo()
+
+    assert result["sub"] == "abc123"
+
+
 def test_create_text_post_raises_clear_error_on_api_failure() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={"message": "Invalid access token"})

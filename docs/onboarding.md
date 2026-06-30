@@ -10,6 +10,7 @@ It covers:
 4. deriving `LINKEDIN_AUTHOR_URN`
 5. saving local environment variables
 6. verifying text, image, and video posts
+7. verifying the authenticated member identity
 
 Employment-data support is separate and more constrained:
 
@@ -23,6 +24,8 @@ Post-management support also splits along member versus organization and read ve
 - `post edit` uses LinkedIn's official Rest.li partial-update flow.
 - `post delete` uses the official `DELETE /rest/posts/{encodedPostUrn}` flow.
 - `post get`, `post batch-get`, and `post list` use the official read surface on `/rest/posts`, which has stricter permissions than write.
+- `image get`, `image list`, `video get`, and `video list` use direct URN reads or Rest.li batch-get on the official asset APIs.
+- `profile whoami` defaults to OIDC `GET /v2/userinfo` and derives `urn:li:person:{sub}` for convenience.
 
 ## Command matrix
 
@@ -41,6 +44,7 @@ Notes:
 - `post get` and `post delete` only need the post URN plus a valid access token and API version.
 - `post edit` supports commentary plus the content CTA fields exposed by LinkedIn's partial-update surface.
 - `post batch-get` is the supported multi-read surface for posts. `post list` remains the `q=author` finder and LinkedIn documents `100` as its max count.
+- `image list` and `video list` are batch-get-by-URN helpers. They are not owner discovery commands because LinkedIn documents sponsored-account-specific finders for those asset APIs.
 - It is normal for `post create` to work while `post get` or `post list` return `403`, because LinkedIn treats read scopes as more restricted than write scopes.
 - If your post text starts with `create`, `get`, `list`, or `delete`, use `licli post create "..."` to avoid ambiguity.
 
@@ -293,6 +297,14 @@ Expected:
 - author URN looks like `urn:li:person:...`
 - token is set
 - API version is a six-digit `YYYYMM`
+
+You can also verify the authenticated member identity directly:
+
+```bash
+uv run licli profile whoami
+```
+
+That command calls OIDC `userinfo` by default and prints a derived `person_urn` that you can reuse as `LINKEDIN_AUTHOR_URN` for member posts.
 
 ## 8. Post a text post
 

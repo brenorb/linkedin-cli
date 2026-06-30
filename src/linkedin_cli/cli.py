@@ -24,6 +24,15 @@ class LinkedInPostClient(Protocol):
         image_path: Path,
         alt_text: str | None = None,
     ) -> object: ...
+    def create_image_post_from_asset(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        image_urn: str,
+        alt_text: str | None = None,
+    ) -> object: ...
     def create_video_post(
         self,
         *,
@@ -31,6 +40,15 @@ class LinkedInPostClient(Protocol):
         commentary: str,
         visibility: str,
         video_path: Path,
+        title: str | None = None,
+    ) -> object: ...
+    def create_video_post_from_asset(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        video_urn: str,
         title: str | None = None,
     ) -> object: ...
     def get_post(self, post_urn: str, *, view_context: str | None = None) -> dict[str, Any]: ...
@@ -58,6 +76,12 @@ class LinkedInPostClient(Protocol):
         content_call_to_action_label: str | None = None,
         content_landing_page: str | None = None,
     ) -> None: ...
+    def get_image(self, image_urn: str) -> dict[str, Any]: ...
+    def batch_get_images(self, image_urns: list[str]) -> dict[str, Any]: ...
+    def get_video(self, video_urn: str) -> dict[str, Any]: ...
+    def batch_get_videos(self, video_urns: list[str]) -> dict[str, Any]: ...
+    def get_userinfo(self) -> dict[str, Any]: ...
+    def get_identity_profile(self) -> dict[str, Any]: ...
     def get_employment_history(self) -> list[dict[str, object]]: ...
     def get_current_employment(self) -> list[dict[str, object]]: ...
 
@@ -134,8 +158,47 @@ def build_parser(*, explicit_post_actions: bool = False) -> argparse.ArgumentPar
         _add_post_create_arguments(post_parser)
         post_parser.set_defaults(post_command="create")
 
+    image_parser = subparsers.add_parser("image", help="Inspect LinkedIn image assets")
+    image_subparsers = image_parser.add_subparsers(dest="image_command", required=True)
+    image_get_parser = image_subparsers.add_parser("get", help="Read an image asset by URN")
+    image_get_parser.add_argument("image_urn", help="Image URN, for example urn:li:image:123")
+    _add_access_token_argument(image_get_parser)
+    _add_api_version_argument(image_get_parser)
+    image_get_parser.set_defaults(image_command="get")
+    image_list_parser = image_subparsers.add_parser(
+        "list",
+        help="Batch read image assets by URN",
+    )
+    image_list_parser.add_argument("--id", dest="image_urns", action="append", required=True, help="Image URN to fetch")
+    _add_access_token_argument(image_list_parser)
+    _add_api_version_argument(image_list_parser)
+    image_list_parser.set_defaults(image_command="list")
+
+    video_parser = subparsers.add_parser("video", help="Inspect LinkedIn video assets")
+    video_subparsers = video_parser.add_subparsers(dest="video_command", required=True)
+    video_get_parser = video_subparsers.add_parser("get", help="Read a video asset by URN")
+    video_get_parser.add_argument("video_urn", help="Video URN, for example urn:li:video:123")
+    _add_access_token_argument(video_get_parser)
+    _add_api_version_argument(video_get_parser)
+    video_get_parser.set_defaults(video_command="get")
+    video_list_parser = video_subparsers.add_parser(
+        "list",
+        help="Batch read video assets by URN",
+    )
+    video_list_parser.add_argument("--id", dest="video_urns", action="append", required=True, help="Video URN to fetch")
+    _add_access_token_argument(video_list_parser)
+    _add_api_version_argument(video_list_parser)
+    video_list_parser.set_defaults(video_command="list")
+
     profile_parser = subparsers.add_parser("profile", help="Read supported LinkedIn profile data")
     profile_subparsers = profile_parser.add_subparsers(dest="profile_command", required=True)
+    whoami_parser = profile_subparsers.add_parser("whoami", help="Read the authenticated member profile")
+    whoami_parser.add_argument(
+        "--source",
+        choices=("userinfo", "identity-me"),
+        default="userinfo",
+        help="Official LinkedIn API source.",
+    )
     employment_parser = profile_subparsers.add_parser(
         "employment-history",
         help="Read employment data from supported LinkedIn profile APIs",
@@ -168,6 +231,12 @@ def main(
 
     if args.command == "post":
         return _run_post(args, environment, client_factory or _default_client_factory)
+    if args.command == "image":
+        return _run_image(args, environment, client_factory or _default_client_factory)
+    if args.command == "video":
+        return _run_video(args, environment, client_factory or _default_client_factory)
+    if args.command == "profile" and args.profile_command == "whoami":
+        return _run_profile_whoami(args, environment, client_factory or _default_client_factory)
     if args.command == "profile" and args.profile_command == "employment-history":
         return _run_employment_history(args, environment, client_factory or _default_client_factory)
 
@@ -196,12 +265,20 @@ def _run_post(
         print(f"Missing required configuration: {', '.join(missing)}.", file=sys.stderr)
         return 2
 
-    if post_command == "create" and args.alt_text and not args.image:
+    if post_command == "create" and args.alt_text and not (args.image or args.image_urn):
         print("Missing required configuration: alt text requires an image.", file=sys.stderr)
         return 2
 
-    if post_command == "create" and args.image and args.video:
+    if post_command == "create" and _post_create_has_conflicting_media(args):
         print("Missing required configuration: choose either an image or a video, not both.", file=sys.stderr)
+        return 2
+
+    if post_command == "create" and args.image and args.image_urn:
+        print("Missing required configuration: choose either an image path or an image URN, not both.", file=sys.stderr)
+        return 2
+
+    if post_command == "create" and args.video and args.video_urn:
+        print("Missing required configuration: choose either a video path or a video URN, not both.", file=sys.stderr)
         return 2
 
     if post_command == "list" and args.count > POST_LIST_MAX_COUNT:
@@ -310,8 +387,10 @@ def _run_employment_history(
 def _add_post_create_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("commentary", nargs="+", help="Post text")
     parser.add_argument("--image", type=Path, help="Path to an image to upload and attach")
+    parser.add_argument("--image-urn", help="Existing LinkedIn image asset URN to reuse")
     parser.add_argument("--alt-text", help="Alt text for the uploaded image")
     parser.add_argument("--video", type=Path, help="Path to a video to upload and attach")
+    parser.add_argument("--video-urn", help="Existing LinkedIn video asset URN to reuse")
     parser.add_argument("--video-title", help="Title for the uploaded video")
     parser.add_argument("--author", help="Author URN, for example urn:li:person:abc123")
     _add_access_token_argument(parser)
@@ -358,6 +437,12 @@ def _post_edit_has_changes(args: argparse.Namespace) -> bool:
     )
 
 
+def _post_create_has_conflicting_media(args: argparse.Namespace) -> bool:
+    has_image = bool(args.image or args.image_urn)
+    has_video = bool(args.video or args.video_urn)
+    return has_image and has_video
+
+
 def _configured_value(cli_value: str | None, env_value: str | None) -> str | None:
     for value in (cli_value, env_value):
         if value is not None and value != "":
@@ -380,6 +465,14 @@ def _create_post(
             image_path=args.image,
             alt_text=args.alt_text,
         )
+    if args.image_urn:
+        return client.create_image_post_from_asset(
+            author=author,
+            commentary=commentary,
+            visibility=args.visibility,
+            image_urn=args.image_urn,
+            alt_text=args.alt_text,
+        )
     if args.video:
         return client.create_video_post(
             author=author,
@@ -388,10 +481,109 @@ def _create_post(
             video_path=args.video,
             title=args.video_title,
         )
+    if args.video_urn:
+        return client.create_video_post_from_asset(
+            author=author,
+            commentary=commentary,
+            visibility=args.visibility,
+            video_urn=args.video_urn,
+            title=args.video_title,
+        )
     return client.create_text_post(
         author=author,
         commentary=commentary,
         visibility=args.visibility,
+    )
+
+
+def _run_image(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> int:
+    client = _configured_client(args, env, client_factory)
+    if client is None:
+        return 2
+
+    try:
+        if args.image_command == "get":
+            print(json.dumps(client.get_image(args.image_urn), indent=2))
+            return 0
+        if args.image_command == "list":
+            print(json.dumps(client.batch_get_images(args.image_urns), indent=2))
+            return 0
+        raise AssertionError(f"Unsupported image command: {args.image_command}")
+    except LinkedInApiError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        _close_client(client)
+
+
+def _run_video(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> int:
+    client = _configured_client(args, env, client_factory)
+    if client is None:
+        return 2
+
+    try:
+        if args.video_command == "get":
+            print(json.dumps(client.get_video(args.video_urn), indent=2))
+            return 0
+        if args.video_command == "list":
+            print(json.dumps(client.batch_get_videos(args.video_urns), indent=2))
+            return 0
+        raise AssertionError(f"Unsupported video command: {args.video_command}")
+    except LinkedInApiError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        _close_client(client)
+
+
+def _run_profile_whoami(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> int:
+    client = _configured_client(args, env, client_factory)
+    if client is None:
+        return 2
+
+    try:
+        if args.source == "identity-me":
+            result = client.get_identity_profile()
+        else:
+            result = client.get_userinfo()
+            sub = result.get("sub")
+            if isinstance(sub, str) and sub:
+                result = dict(result)
+                result["person_urn"] = f"urn:li:person:{sub}"
+        print(json.dumps(result, indent=2))
+        return 0
+    except LinkedInApiError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        _close_client(client)
+
+
+def _configured_client(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> LinkedInPostClient | None:
+    access_token = _configured_value(getattr(args, "access_token", None), env.get("LINKEDIN_ACCESS_TOKEN"))
+    api_version = _configured_value(getattr(args, "api_version", None), env.get("LINKEDIN_API_VERSION"))
+    if access_token is None:
+        print("Missing required configuration: access token.", file=sys.stderr)
+        return None
+    return cast(
+        LinkedInPostClient,
+        client_factory(access_token=access_token, api_version=api_version or DEFAULT_API_VERSION),
     )
 
 

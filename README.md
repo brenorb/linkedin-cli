@@ -62,6 +62,22 @@ uv run licli post \
   "Hello from the new Posts API"
 ```
 
+Reuse an existing uploaded image or video asset:
+
+```bash
+uv run licli post \
+  --image-urn "urn:li:image:123456" \
+  --alt-text "Bitdevs BSB event banner" \
+  "Hello from the new Posts API"
+```
+
+```bash
+uv run licli post \
+  --video-urn "urn:li:video:123456" \
+  --video-title "Linus on abstraction" \
+  "Hello from the new Posts API"
+```
+
 You can also pass values as flags:
 
 ```bash
@@ -95,6 +111,26 @@ Read multiple posts by URN:
 
 ```bash
 uv run licli post batch-get "urn:li:share:123456789" "urn:li:share:987654321"
+```
+
+Inspect an image or video asset by URN:
+
+```bash
+uv run licli image get "urn:li:image:123456"
+uv run licli video get "urn:li:video:123456"
+```
+
+Batch-read multiple assets by URN:
+
+```bash
+uv run licli image list --id "urn:li:image:123456" --id "urn:li:image:789012"
+uv run licli video list --id "urn:li:video:123456" --id "urn:li:video:789012"
+```
+
+Inspect the authenticated member identity:
+
+```bash
+uv run licli profile whoami
 ```
 
 Edit a post's text or content CTA:
@@ -154,6 +190,9 @@ Command support differs depending on whether you are acting as a member or an or
 | `post get` | Works only if LinkedIn has granted restricted `r_member_social` | Works only if LinkedIn has granted `r_organization_social` | Self-serve apps often do not have member read access even when posting works. |
 | `post batch-get` | Works only if LinkedIn has granted restricted `r_member_social` | Works only if LinkedIn has granted `r_organization_social` | Uses Rest.li batch get on `/rest/posts`. |
 | `post list` | Works only if LinkedIn has granted restricted `r_member_social` and you provide a member author URN | Works only if LinkedIn has granted `r_organization_social` and you provide an organization author URN | Uses the official `q=author` finder on `/rest/posts`. |
+| `image get` / `image list` | Depends on image read access; member write tokens may still fail on reads | Owner/admin gated | This CLI supports direct get and batch-get-by-URN, not owner discovery. |
+| `video get` / `video list` | Owner/admin gated | Owner/admin gated | This CLI supports direct get and batch-get-by-URN, not owner discovery. |
+| `profile whoami` | Works with OIDC `userinfo`; `identity-me` needs extra profile scopes | N/A | `userinfo` is the default and returns a derived `urn:li:person:...`. |
 
 Practical consequence: create and delete can work while get and list still return `403` because the read scopes are more restricted than the write scopes.
 
@@ -164,6 +203,8 @@ This CLI defaults `LINKEDIN_API_VERSION` to `202606`. If LinkedIn rotates active
 For image posts, this project uses LinkedIn's Images API to initialize an upload, uploads the binary to the returned `uploadUrl`, and then creates the post with the returned `urn:li:image:...`.
 
 For video posts, this project uses LinkedIn's Videos API to initialize the upload, uploads each instructed part, finalizes the upload, waits for the asset to become `AVAILABLE`, and then creates the post with the returned `urn:li:video:...`.
+
+For asset inspection, this project exposes direct read and Rest.li batch-get by asset URN. LinkedIn's general image/video discovery surfaces are tied to sponsored or media-library accounts, so this CLI does not pretend that member/org owner listing is broadly available.
 
 For employment data, the official API surface is constrained:
 

@@ -155,6 +155,28 @@ class LinkedInClient:
 
         return _response_json(response)
 
+    def get_image(self, image_urn: str) -> dict[str, Any]:
+        encoded_image_urn = quote(image_urn, safe="")
+        response = self._client.get(f"/rest/images/{encoded_image_urn}")
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+        return _response_json(response)
+
+    def batch_get_images(self, image_urns: list[str]) -> dict[str, Any]:
+        return self._batch_get_restli_entities("/rest/images", image_urns)
+
+    def get_video(self, video_urn: str) -> dict[str, Any]:
+        encoded_video_urn = quote(video_urn, safe="")
+        response = self._client.get(f"/rest/videos/{encoded_video_urn}")
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+        return _response_json(response)
+
+    def batch_get_videos(self, video_urns: list[str]) -> dict[str, Any]:
+        return self._batch_get_restli_entities("/rest/videos", video_urns)
+
     def delete_post(self, post_urn: str) -> None:
         encoded_post_urn = quote(post_urn, safe="")
         response = self._client.delete(
@@ -188,6 +210,20 @@ class LinkedInClient:
         )
         if response.is_error:
             raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+    def get_userinfo(self) -> dict[str, Any]:
+        response = self._client.get("/v2/userinfo")
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+        return _response_json(response)
+
+    def get_identity_profile(self) -> dict[str, Any]:
+        response = self._client.get("/rest/identityMe")
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+        return _response_json(response)
 
     def get_employment_history(self) -> list[dict[str, object]]:
         response = self._client.get("/v2/me", params={"projection": "(positions)"})
@@ -232,6 +268,26 @@ class LinkedInClient:
         post_id = response.headers.get("x-restli-id") or body.get("id")
         return PostCreationResult(post_id=post_id, response=body)
 
+    def create_image_post_from_asset(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        image_urn: str,
+        alt_text: str | None = None,
+        visibility: str = "PUBLIC",
+    ) -> PostCreationResult:
+        media: dict[str, Any] = {"id": image_urn}
+        if alt_text:
+            media["altText"] = alt_text
+
+        return self._create_media_post(
+            author=author,
+            commentary=commentary,
+            visibility=visibility,
+            media=media,
+        )
+
     def create_video_post(
         self,
         *,
@@ -274,6 +330,26 @@ class LinkedInClient:
         body = _response_json(response)
         post_id = response.headers.get("x-restli-id") or body.get("id")
         return PostCreationResult(post_id=post_id, response=body)
+
+    def create_video_post_from_asset(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        video_urn: str,
+        title: str | None = None,
+        visibility: str = "PUBLIC",
+    ) -> PostCreationResult:
+        media: dict[str, Any] = {"id": video_urn}
+        if title:
+            media["title"] = title
+
+        return self._create_media_post(
+            author=author,
+            commentary=commentary,
+            visibility=visibility,
+            media=media,
+        )
 
     def _initialize_image_upload(self, *, owner: str) -> tuple[str, str]:
         response = self._client.post(
@@ -422,6 +498,40 @@ class LinkedInClient:
             if time.monotonic() >= deadline:
                 raise LinkedInApiError(response.status_code, "Timed out waiting for video processing")
             time.sleep(self._video_wait_interval)
+
+    def _create_media_post(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        media: dict[str, Any],
+    ) -> PostCreationResult:
+        payload = _post_payload(
+            author=author,
+            commentary=commentary,
+            visibility=visibility,
+            content={"media": media},
+        )
+
+        response = self._client.post("/rest/posts", json=payload)
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+        body = _response_json(response)
+        post_id = response.headers.get("x-restli-id") or body.get("id")
+        return PostCreationResult(post_id=post_id, response=body)
+
+    def _batch_get_restli_entities(self, path_prefix: str, urns: list[str]) -> dict[str, Any]:
+        encoded_urns = ",".join(quote(urn, safe="") for urn in urns)
+        response = self._client.get(
+            f"{path_prefix}?ids=List({encoded_urns})",
+            headers={"X-RestLi-Method": "BATCH_GET"},
+        )
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+
+        return _response_json(response)
 
 
 def _post_payload(
