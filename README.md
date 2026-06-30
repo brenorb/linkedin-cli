@@ -6,15 +6,26 @@ Small CLI for supported LinkedIn API workflows.
 
 This project is intentionally narrow:
 
-- publish a text post as a member or organization
-- publish an image post as a member or organization
-- publish a video post as a member or organization
-- read employment data from official LinkedIn profile APIs when your app tier and scopes allow it
-- use the current LinkedIn `Posts API`
+- basic organic member or organization post management: create, edit, get, batch-get, list, and delete
+- image and video posting through the official upload flows
+- reuse of existing image and video assets by URN
+- direct image and video asset inspection by URN or batch-get by URN
+- `profile whoami` plus limited employment-data helpers when your app tier and scopes allow it
 - stay easy to read and easy to fork
 
 It does not try to automate OAuth in a fragile way. You bring your own access token and author URN.
 It does not scrape LinkedIn pages or rely on undocumented web endpoints.
+
+It also does not try to cover every official LinkedIn content surface. Out of scope for this CLI:
+
+- article or document posts
+- polls
+- multi-image or carousel posts
+- reshares
+- targeted org posts
+- dark posts and `adContext`
+- sponsored-account media library discovery flows
+- organization admin discovery or authorization checks
 
 ## Install
 

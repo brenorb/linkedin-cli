@@ -26,6 +26,7 @@ Post-management support also splits along member versus organization and read ve
 - `post get`, `post batch-get`, and `post list` use the official read surface on `/rest/posts`, which has stricter permissions than write.
 - `image get`, `image list`, `video get`, and `video list` use direct URN reads or Rest.li batch-get on the official asset APIs.
 - `profile whoami` defaults to OIDC `GET /v2/userinfo` and derives `urn:li:person:{sub}` for convenience.
+- organization discovery remains separate because LinkedIn documents it under admin-scoped organization ACL and authorization APIs.
 
 ## Command matrix
 
@@ -305,6 +306,8 @@ uv run licli profile whoami
 ```
 
 That command calls OIDC `userinfo` by default and prints a derived `person_urn` that you can reuse as `LINKEDIN_AUTHOR_URN` for member posts.
+
+It does not list organizations you can act for. LinkedIn treats that as an organization-admin concern, not as a basic identity concern.
 
 ## 8. Post a text post
 
