@@ -55,3 +55,5 @@ Avoid storing tokens in tracked repo files.
 - Active versions change over time. If a version stops working, update it to a currently active `YYYYMM`.
 
 See [onboarding.md](onboarding.md) for the full step-by-step setup flow.
+
+The published PyPI package is `lkdn`. The CLI entrypoints are `licli`, `lkdn`, and `linkedin`.

@@ -41,10 +41,10 @@ class ClientFactory(Protocol):
     def __call__(self, *, access_token: str, api_version: str) -> LinkedInPostClient: ...
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(*, prog: str | None = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="licli",
-        description="Publish a plain-text post with LinkedIn's Posts API.",
+        prog=prog,
+        description="Publish LinkedIn posts and inspect supported profile data.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -90,7 +90,7 @@ def main(
     env: Mapping[str, str] | None = None,
     client_factory: ClientFactory | None = None,
 ) -> int:
-    parser = build_parser()
+    parser = build_parser(prog=Path(sys.argv[0]).name if argv is None else None)
     args = parser.parse_args(argv)
     environment = dict(os.environ if env is None else env)
 

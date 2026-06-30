@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.12"
 
 [options]
-exclude-newer = "2026-06-17T18:46:19.955159Z"
+exclude-newer = "2026-06-23T15:40:23.737199Z"
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
@@ -96,7 +96,7 @@ wheels = [
 ]
 
 [[package]]
-name = "licli"
+name = "lkdn"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
