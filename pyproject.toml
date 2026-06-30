@@ -1,6 +1,6 @@
 [project]
 name = "lkdn"
-version = "0.1.0"
+version = "0.1.1"
 description = "Minimal CLI for publishing LinkedIn text posts with the Posts API"
 readme = "README.md"
 authors = [
