@@ -2,13 +2,6 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 
-[options]
-exclude-newer = "2026-06-23T18:41:14.838143Z"
-exclude-newer-span = "P7D"
-
-[options.exclude-newer-package]
-docs2epub = false
-
 [[package]]
 name = "anyio"
 version = "4.13.0"
@@ -96,8 +89,8 @@ wheels = [
 ]
 
 [[package]]
-name = "licli"
-version = "0.1.0"
+name = "lkdn"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

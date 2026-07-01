@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from linkedin_cli.cli import main
+from linkedin_cli.cli import build_parser, main
 from linkedin_cli.client import LinkedInApiError
 
 
@@ -78,6 +78,12 @@ def test_cli_post_create_alias_uses_create_flow(capsys: pytest.CaptureFixture[st
         "visibility": "PUBLIC",
     }
     assert "urn:li:share:123" in stdout
+
+
+def test_cli_parser_uses_requested_program_name() -> None:
+    parser = build_parser(prog="lkdn")
+
+    assert parser.prog == "lkdn"
 
 
 def test_cli_post_with_image_uses_image_flow(

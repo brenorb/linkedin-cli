@@ -256,9 +256,13 @@ COMMENTS_STATE_OPTIONS = ("OPEN", "CLOSED")
 ORGANIZATION_ACCESS_STATES = ("APPROVED", "REQUESTED", "REVOKED", "REJECTED")
 
 
-def build_parser(*, explicit_post_actions: bool = False) -> argparse.ArgumentParser:
+def build_parser(
+    *,
+    explicit_post_actions: bool = False,
+    prog: str | None = None,
+) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="licli",
+        prog=prog,
         description="Publish and manage LinkedIn posts with the official API.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -659,7 +663,10 @@ def main(
     client_factory: ClientFactory | None = None,
 ) -> int:
     argv_list = list(sys.argv[1:] if argv is None else argv)
-    parser = build_parser(explicit_post_actions=_uses_explicit_post_action(argv_list))
+    parser = build_parser(
+        explicit_post_actions=_uses_explicit_post_action(argv_list),
+        prog=Path(sys.argv[0]).name if argv is None else None,
+    )
     args = parser.parse_args(argv_list)
     environment = dict(os.environ if env is None else env)
 

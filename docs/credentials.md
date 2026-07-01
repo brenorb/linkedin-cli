@@ -81,3 +81,5 @@ Avoid storing tokens in tracked repo files.
 - `profile whoami --source profile-api` uses `/v2/me`, which is a different identity source from both OIDC `userinfo` and `identity-me`.
 
 See [onboarding.md](onboarding.md) for the full step-by-step setup flow.
+
+The published PyPI package is `lkdn`. The CLI entrypoints are `licli`, `lkdn`, and `linkedin`.

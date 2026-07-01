@@ -1,6 +1,8 @@
 # LinkedIn onboarding
 
-This guide walks through the full member-posting setup for `licli` without exposing your token to anyone else.
+This guide walks through the full member-posting setup for `lkdn` without exposing your token to anyone else.
+
+The published PyPI package is `lkdn`. The installed command aliases are `licli`, `lkdn`, and `linkedin`.
 
 It covers:
 

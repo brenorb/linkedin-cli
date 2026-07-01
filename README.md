@@ -1,4 +1,4 @@
-# licli
+# lkdn
 
 Small CLI for supported LinkedIn API workflows.
 
@@ -31,6 +31,14 @@ It also does not try to cover every official LinkedIn content surface. Out of sc
 ```bash
 uv sync
 ```
+
+PyPI distribution: `lkdn`
+
+Command aliases:
+
+- `licli`
+- `lkdn`
+- `linkedin`
 
 ## Usage
 
