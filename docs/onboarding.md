@@ -10,7 +10,8 @@ It covers:
 4. deriving `LINKEDIN_AUTHOR_URN`
 5. saving local environment variables
 6. verifying text, image, and video posts
-7. verifying the authenticated member identity
+7. verifying article, document, and multi-image posts
+8. verifying organization preflight and the authenticated member identity
 
 Employment-data support is separate and more constrained:
 
@@ -21,32 +22,80 @@ Employment-data support is separate and more constrained:
 Post-management support also splits along member versus organization and read versus write permissions:
 
 - `post` and `post create` use the official Posts API create flow.
+- `post --poll-question ...` uses the official organic poll support on the Posts API.
+- `post --reshare-post-urn` uses the official Posts API reshare flow.
+- `post --article-url ...` uses the official article content support on the Posts API, with either an image URN or a local thumbnail upload.
+- `post --document ...` uses the official Documents API upload flow plus post creation.
+- `post --multi-image ...` uses the official MultiImage post support on the Posts API after image uploads.
+- `post --multi-image-urn ...` reuses existing image URNs and supports per-image alt text.
+- `post edit` also exposes lifecycle-state updates on the official partial-update surface.
 - `post edit` uses LinkedIn's official Rest.li partial-update flow.
 - `post delete` uses the official `DELETE /rest/posts/{encodedPostUrn}` flow.
 - `post get`, `post batch-get`, and `post list` use the official read surface on `/rest/posts`, which has stricter permissions than write.
-- `image get`, `image list`, `video get`, and `video list` use direct URN reads or Rest.li batch-get on the official asset APIs.
+- `comment get`, `comment list`, `comment batch-get`, `comment create`, `comment edit`, and `comment delete` use the official Comments API on `/rest/socialActions/.../comments`.
+- `reaction create`, `reaction get`, `reaction list`, `reaction batch-get`, and `reaction delete` use the official Reactions API on `/rest/reactions`.
+- `social-metadata get`, `social-metadata batch-get`, and `social-metadata set-comments-state` use the official Social Metadata API on `/rest/socialMetadata`.
+- `image get`, `image list`, `document get`, `document list`, `video get`, and `video list` use direct URN reads or Rest.li batch-get on the official asset APIs.
+- `organization list` and `organization members` use the official organization ACL finder to discover which orgs the authenticated viewer can act for.
+- `organization preflight` uses the ACL finder for context and the official organization-authorizations endpoint for exact org-authorization checks on post-management actions.
 - `profile whoami` defaults to OIDC `GET /v2/userinfo` and derives `urn:li:person:{sub}` for convenience.
-- organization discovery remains separate because LinkedIn documents it under admin-scoped organization ACL and authorization APIs.
 
 ## Command matrix
 
 | Command | Works for member URNs | Works for organization URNs | Required scope family |
 | --- | --- | --- | --- |
 | `licli post ...` / `licli post create ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `licli post --poll-question ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `licli post --reshare-post-urn ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `licli post --article-url ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `licli post --document ...` | Yes | Yes, but org-owned uploads are stricter | `w_member_social` for members, `w_organization_social` for organizations |
+| `licli post --multi-image ...` | Yes | Yes, for the post itself | `w_member_social` for members, `w_organization_social` for organizations; company-owned image uploads can additionally require `ADMINISTRATOR` or `DIRECT_SPONSORED_CONTENT_POSTER` |
+| `licli post --multi-image-urn ...` | Yes | Yes, for the post itself | `w_member_social` for members, `w_organization_social` for organizations; org-owned image assets still follow LinkedIn's stricter image-owner rules |
 | `licli post edit <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
 | `licli post delete <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
 | `licli post get <post-urn>` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
 | `licli post batch-get <post-urn>...` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
 | `licli post list [--author ...]` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
+| `licli comment get ...` / `licli comment list ...` / `licli comment batch-get ...` | Only when LinkedIn has granted restricted member feed-read access | Yes, when your app has organization feed-read access | `r_member_social_feed` for members, `r_organization_social_feed` for organizations |
+| `licli comment create ...` / `licli comment edit ...` / `licli comment delete ...` | Yes | Yes | `w_member_social_feed` for members, `w_organization_social_feed` for organizations |
+| `licli reaction create ...` / `licli reaction delete ...` | Yes | Yes | `w_member_social_feed` for members, `w_organization_social_feed` for organizations |
+| `licli reaction get ...` / `licli reaction list ...` / `licli reaction batch-get ...` | Only when LinkedIn has granted restricted member feed-read access | Yes, when your app has organization feed-read access | `r_member_social_feed` for members, `r_organization_social_feed` for organizations |
+| `licli social-metadata get ...` / `licli social-metadata batch-get ...` | Only when LinkedIn has granted restricted member feed-read access | Yes, when your app has organization feed-read access | `r_member_social_feed` for members, `r_organization_social_feed` for organizations |
+| `licli social-metadata set-comments-state ...` | Yes | Yes | `w_member_social_feed` for members, `w_organization_social_feed` for organizations; closing a thread deletes its existing comments |
+| `licli document get ...` / `licli document list ...` | Person-owned reads require owner access | Company-owned reads require stronger org access | LinkedIn documents company-owned document GETs for `ADMINISTRATOR` or `DIRECT_SPONSORED_CONTENT_POSTER`, plus separate sponsored-account flows |
+| `licli organization list` / `licli organization members` | Uses the authenticated viewer/admin context to inspect org access | N/A | `r_organization_admin` or `rw_organization_admin` |
+| `licli organization preflight` | Uses the authenticated viewer plus a matching member URN to inspect one org's post-management authorization state | N/A | Restricted `rw_organization_admin` plus ACL discovery access; does not verify separate Posts API OAuth scopes |
+| `licli profile whoami` | Works with OIDC `userinfo`, `profile-api`, or `identity-me` depending on your app access | N/A | `userinfo` uses `openid profile`; `profile-api` uses `/v2/me`; `identity-me` needs the Verified on LinkedIn product plus `r_profile_basicinfo`, and it follows a separate release track from the `YYYYMM` Marketing API versions. |
 
 Notes:
 
 - `LINKEDIN_AUTHOR_URN` is used by `post create` and `post list`. It can be either `urn:li:person:...` or `urn:li:organization:...`.
+- `LINKEDIN_MEMBER_URN` is used by `organization preflight`. It should always be `urn:li:person:...` and must match the authenticated viewer.
 - `post get` and `post delete` only need the post URN plus a valid access token and API version.
+- `comment get`, `comment list`, `comment batch-get`, `reaction ...`, and `social-metadata ...` also work without `LINKEDIN_AUTHOR_URN`; they use explicit URNs in the command itself.
+- `comment create`, `comment edit`, and `comment delete` also do not need `LINKEDIN_AUTHOR_URN`.
+- `comment create` requires explicit `--actor`.
+- `comment create --parent-comment ...` supports replies, but LinkedIn does not allow reply content entities, so `--content-image-urn` is only valid on non-reply comments.
+- `comment edit` and `comment delete` accept optional `--actor`, which some org flows require.
 - `post edit` supports commentary plus the content CTA fields exposed by LinkedIn's partial-update surface.
 - `post batch-get` is the supported multi-read surface for posts. `post list` remains the `q=author` finder and LinkedIn documents `100` as its max count.
-- `image list` and `video list` are batch-get-by-URN helpers. They are not owner discovery commands because LinkedIn documents sponsored-account-specific finders for those asset APIs.
+- `image list`, `document list`, and `video list` are batch-get-by-URN helpers. They are not owner discovery commands because LinkedIn documents sponsored-account-specific finders for those asset APIs.
+- `image get` and `image list` are not implied by basic member-posting access. LinkedIn documents `/rest/images` reads separately and explicitly warns that `w_member_social` alone is not enough for image GETs.
+- `document get/list` and `video get/list` also have owner-type-specific rules. Company-owned assets can require `ADMINISTRATOR` or `DIRECT_SPONSORED_CONTENT_POSTER`, while person-owned reads are generally owner-scoped.
+- LinkedIn's role model is stricter for company-owned `image`, `document`, and `video` uploads than for plain org post creation. A content admin may be able to create a text org post but still fail on company-owned media uploads.
+- `organization preflight` paginates through ACL pages before deciding; it does not stop at the first 100 rows and accepts both `organization` and `organizationTarget` ACL response shapes.
+- `organization preflight` now treats ACL rows as inventory only. The returned booleans come from official `organizationAuthorizations` checks for `ORGANIC_SHARE_CREATE`, `ORGANIC_SHARE_VIEW_AS_AUTHOR`, `ORGANIC_SHARE_EDIT`, and `ORGANIC_SHARE_DELETE`.
+- The preflight response therefore includes `roles`, `states`, `aclApprovedRoles`, `canCreateOrganicPosts`, `canReadOrganizationPosts`, `canEditOrganicPosts`, and `canDeleteOrganicPosts`.
+- Those booleans reflect org authorization only. They do not prove that the token also has `w_organization_social` or `r_organization_social`.
 - It is normal for `post create` to work while `post get` or `post list` return `403`, because LinkedIn treats read scopes as more restricted than write scopes.
+- The newer comments, reactions, and social-metadata endpoints use the `*_social_feed` scope family, not the Posts API `*_social` scopes.
+- `reaction delete` and `social-metadata set-comments-state` are feed-write operations even though they do not create a post.
+- `comment edit`, `comment delete`, and `social-metadata set-comments-state` are intentionally stricter about thread targeting than read commands: they require a thread URN, not a comment URN.
+- `social-metadata set-comments-state --state CLOSED` is destructive on the official API: LinkedIn deletes the thread's existing comments when it closes comments.
+- For organization authors, feed-write roles are not identical to org post-write roles. LinkedIn documents `RECRUITING_POSTER` on the feed-write side, while org post creation/editing uses the separate content-admin/posting role model.
+- LinkedIn's current Posts API models mentions and annotations inline in the commentary text itself, so `licli` keeps commentary input as text rather than inventing a second mention DSL.
+- For comment write operations, `licli` exposes the official mention/content payloads through `--attributes-json` and `--content-image-urn` instead of inventing a bespoke mention syntax.
+- `organization preflight` is deliberately an organic-post capability helper. It does not promise that company-owned image/video/document uploads will succeed, because LinkedIn documents stricter asset-upload role gates for those APIs.
 - If your post text starts with `create`, `get`, `list`, or `delete`, use `licli post create "..."` to avoid ambiguity.
 
 ## Prerequisites
@@ -66,6 +115,7 @@ The app should have:
 
 - `Share on LinkedIn`
 - `Sign In with LinkedIn`
+- `Verified on LinkedIn` if you plan to use `profile whoami --source identity-me` or `profile employment-history --source identity-me`
 
 The redirect URL should be exactly:
 
@@ -99,6 +149,7 @@ export LINKEDIN_CLIENT_SECRET='YOUR_CLIENT_SECRET'
 export LINKEDIN_REDIRECT_URI='http://localhost:8000/callback'
 export LINKEDIN_SCOPE='w_member_social openid profile email'
 export LINKEDIN_API_VERSION='202606'
+export LINKEDIN_IDENTITY_API_VERSION='202510.03'
 EOF
 
 chmod 600 ~/.config/licli/env.sh
@@ -111,8 +162,24 @@ If you are preparing an organization-author flow, request the organization scope
 - organization create/delete: `w_organization_social`
 - member get/list: restricted `r_member_social`
 - organization get/list: `r_organization_social`
+- member comment/social-metadata read: restricted `r_member_social_feed`
+- organization comment/social-metadata read: `r_organization_social_feed`
+- member comment write: `w_member_social_feed`
+- organization comment write: `w_organization_social_feed`
+- member reaction write: `w_member_social_feed`
+- organization reaction write: `w_organization_social_feed`
+- member reaction delete and comments-state update: `w_member_social_feed`
+- organization reaction delete and comments-state update: `w_organization_social_feed`
+- organization ACL discovery: `r_organization_admin` or `rw_organization_admin`
+- organization post preflight: restricted `rw_organization_admin`
 
 Do not assume you can simply add the read scopes to a self-serve app; LinkedIn may not grant them.
+
+For organization preflight and discovery, store the member URN separately when convenient:
+
+```bash
+export LINKEDIN_MEMBER_URN='urn:li:person:YOUR_ID'
+```
 
 ## 3. Generate the authorization URL
 
@@ -298,6 +365,7 @@ Expected:
 - author URN looks like `urn:li:person:...`
 - token is set
 - API version is a six-digit `YYYYMM`
+- identity API version, if set, may be a dotted Verified on LinkedIn release such as `202510.03`
 
 You can also verify the authenticated member identity directly:
 
@@ -306,6 +374,20 @@ uv run licli profile whoami
 ```
 
 That command calls OIDC `userinfo` by default and prints a derived `person_urn` that you can reuse as `LINKEDIN_AUTHOR_URN` for member posts.
+
+If your app has Profile API access, you can use the older identity source directly:
+
+```bash
+uv run licli profile whoami --source profile-api
+```
+
+If your app has Verified on LinkedIn profile access, you can also force the alternate source:
+
+```bash
+uv run licli profile whoami --source identity-me --identity-api-version 202510.03
+```
+
+If LinkedIn returns `403 No valid API product assigned`, add the `Verified on LinkedIn` product to the app; scopes alone are not enough for `/rest/identityMe`.
 
 It does not list organizations you can act for. LinkedIn treats that as an organization-admin concern, not as a basic identity concern.
 
@@ -378,7 +460,11 @@ to derive the member identifier instead.
 
 ### `426 Requested version ... is not active`
 
-The `Linkedin-Version` header must be in `YYYYMM` format only.
+The shared Marketing API `Linkedin-Version` header must be in `YYYYMM` format.
+
+Exception:
+
+- Verified on LinkedIn `/rest/identityMe` uses its own release track and may require a dotted version such as `202510.03`
 
 Bad:
 
