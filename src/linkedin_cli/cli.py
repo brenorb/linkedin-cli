@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import sys
@@ -9,12 +10,37 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Protocol, cast
 
-from linkedin_cli.client import DEFAULT_API_VERSION, LinkedInApiError, LinkedInClient
+from linkedin_cli.client import (
+    DEFAULT_API_VERSION,
+    DEFAULT_IDENTITY_API_VERSION,
+    MAX_MULTI_IMAGE_COUNT,
+    MIN_MULTI_IMAGE_COUNT,
+    LinkedInApiError,
+    LinkedInClient,
+)
 from linkedin_cli.employment import filter_employment_history
 
 
 class LinkedInPostClient(Protocol):
     def create_text_post(self, *, author: str, commentary: str, visibility: str) -> object: ...
+    def create_poll_post(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        question: str,
+        options: list[str],
+        duration: str,
+    ) -> object: ...
+    def create_reshare_post(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        reshared_post_urn: str,
+    ) -> object: ...
     def create_image_post(
         self,
         *,
@@ -41,6 +67,8 @@ class LinkedInPostClient(Protocol):
         visibility: str,
         video_path: Path,
         title: str | None = None,
+        captions_path: Path | None = None,
+        thumbnail_path: Path | None = None,
     ) -> object: ...
     def create_video_post_from_asset(
         self,
@@ -50,6 +78,54 @@ class LinkedInPostClient(Protocol):
         visibility: str,
         video_urn: str,
         title: str | None = None,
+    ) -> object: ...
+    def create_document_post(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        document_path: Path,
+        title: str,
+    ) -> object: ...
+    def create_document_post_from_asset(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        document_urn: str,
+        title: str,
+    ) -> object: ...
+    def create_article_post(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        article_url: str,
+        title: str,
+        description: str | None = None,
+        thumbnail_image_urn: str | None = None,
+        thumbnail_image_path: Path | None = None,
+    ) -> object: ...
+    def create_multi_image_post(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        image_paths: list[Path],
+        alt_texts: list[str] | None = None,
+    ) -> object: ...
+    def create_multi_image_post_from_assets(
+        self,
+        *,
+        author: str,
+        commentary: str,
+        visibility: str,
+        image_urns: list[str],
+        alt_texts: list[str] | None = None,
     ) -> object: ...
     def get_post(self, post_urn: str, *, view_context: str | None = None) -> dict[str, Any]: ...
     def list_posts(
@@ -75,15 +151,98 @@ class LinkedInPostClient(Protocol):
         commentary: str | None = None,
         content_call_to_action_label: str | None = None,
         content_landing_page: str | None = None,
+        lifecycle_state: str | None = None,
     ) -> None: ...
     def get_image(self, image_urn: str) -> dict[str, Any]: ...
     def batch_get_images(self, image_urns: list[str]) -> dict[str, Any]: ...
+    def get_document(self, document_urn: str) -> dict[str, Any]: ...
+    def batch_get_documents(self, document_urns: list[str]) -> dict[str, Any]: ...
     def get_video(self, video_urn: str) -> dict[str, Any]: ...
     def batch_get_videos(self, video_urns: list[str]) -> dict[str, Any]: ...
     def get_userinfo(self) -> dict[str, Any]: ...
+    def get_profile_identity(self) -> dict[str, Any]: ...
     def get_identity_profile(self) -> dict[str, Any]: ...
     def get_employment_history(self) -> list[dict[str, object]]: ...
     def get_current_employment(self) -> list[dict[str, object]]: ...
+    def list_organization_access(
+        self,
+        *,
+        count: int,
+        start: int,
+        role: str | None = None,
+        state: str | None = None,
+    ) -> dict[str, Any]: ...
+    def list_organization_access_by_organization(
+        self,
+        *,
+        organization: str,
+        count: int,
+        start: int,
+        role: str | None = None,
+        state: str | None = None,
+    ) -> dict[str, Any]: ...
+    def preflight_organization_author(
+        self,
+        *,
+        role_assignee: str,
+        organization: str,
+    ) -> dict[str, Any]: ...
+    def create_comment(
+        self,
+        *,
+        target_urn: str,
+        actor: str,
+        text: str,
+        parent_comment: str | None = None,
+        attributes: list[dict[str, object]] | None = None,
+        content_image_urn: str | None = None,
+    ) -> dict[str, Any]: ...
+    def get_comment(self, target_urn: str, comment_id: str) -> dict[str, Any]: ...
+    def list_comments(self, *, target_urn: str, count: int, start: int) -> dict[str, Any]: ...
+    def batch_get_comments(self, target_urn: str, comment_ids: list[str]) -> dict[str, Any]: ...
+    def update_comment(
+        self,
+        *,
+        target_urn: str,
+        comment_id: str,
+        text: str,
+        actor: str | None = None,
+        attributes: list[dict[str, object]] | None = None,
+    ) -> None: ...
+    def delete_comment(
+        self,
+        *,
+        target_urn: str,
+        comment_id: str,
+        actor: str | None = None,
+    ) -> None: ...
+    def create_reaction(
+        self,
+        *,
+        actor: str,
+        root: str,
+        reaction_type: str,
+    ) -> dict[str, Any]: ...
+    def get_reaction(self, *, actor: str, entity: str) -> dict[str, Any]: ...
+    def batch_get_reactions(self, keys: list[tuple[str, str]]) -> dict[str, Any]: ...
+    def list_reactions(
+        self,
+        *,
+        entity: str,
+        count: int,
+        start: int,
+        sort: str,
+    ) -> dict[str, Any]: ...
+    def delete_reaction(self, *, actor: str, entity: str) -> None: ...
+    def get_social_metadata(self, entity_urn: str) -> dict[str, Any]: ...
+    def batch_get_social_metadata(self, entity_urns: list[str]) -> dict[str, Any]: ...
+    def update_social_metadata_comments_state(
+        self,
+        *,
+        entity_urn: str,
+        actor: str,
+        comments_state: str,
+    ) -> None: ...
 
 
 ClientFactory = Callable[..., object]
@@ -92,6 +251,9 @@ POST_ACTIONS = {"create", "get", "list", "delete", "edit", "batch-get"}
 POST_VIEW_CONTEXTS = ("AUTHOR", "READER")
 POST_SORT_OPTIONS = ("LAST_MODIFIED", "CREATED")
 POST_LIST_MAX_COUNT = 100
+REACTION_SORT_OPTIONS = ("CHRONOLOGICAL", "REVERSE_CHRONOLOGICAL", "RELEVANCE")
+COMMENTS_STATE_OPTIONS = ("OPEN", "CLOSED")
+ORGANIZATION_ACCESS_STATES = ("APPROVED", "REQUESTED", "REVOKED", "REJECTED")
 
 
 def build_parser(*, explicit_post_actions: bool = False) -> argparse.ArgumentParser:
@@ -153,6 +315,7 @@ def build_parser(*, explicit_post_actions: bool = False) -> argparse.ArgumentPar
         edit_parser.add_argument("--text", dest="edited_commentary", help="Replacement post text")
         edit_parser.add_argument("--cta-label", help="Content call-to-action label")
         edit_parser.add_argument("--landing-page", help="Landing page URL for the content CTA")
+        edit_parser.add_argument("--lifecycle-state", help="Replacement post lifecycle state")
         edit_parser.set_defaults(post_command="edit")
     else:
         _add_post_create_arguments(post_parser)
@@ -174,6 +337,31 @@ def build_parser(*, explicit_post_actions: bool = False) -> argparse.ArgumentPar
     _add_api_version_argument(image_list_parser)
     image_list_parser.set_defaults(image_command="list")
 
+    document_parser = subparsers.add_parser("document", help="Inspect LinkedIn document assets")
+    document_subparsers = document_parser.add_subparsers(dest="document_command", required=True)
+    document_get_parser = document_subparsers.add_parser("get", help="Read a document asset by URN")
+    document_get_parser.add_argument(
+        "document_urn",
+        help="Document URN, for example urn:li:document:123",
+    )
+    _add_access_token_argument(document_get_parser)
+    _add_api_version_argument(document_get_parser)
+    document_get_parser.set_defaults(document_command="get")
+    document_list_parser = document_subparsers.add_parser(
+        "list",
+        help="Batch read document assets by URN",
+    )
+    document_list_parser.add_argument(
+        "--id",
+        dest="document_urns",
+        action="append",
+        required=True,
+        help="Document URN to fetch",
+    )
+    _add_access_token_argument(document_list_parser)
+    _add_api_version_argument(document_list_parser)
+    document_list_parser.set_defaults(document_command="list")
+
     video_parser = subparsers.add_parser("video", help="Inspect LinkedIn video assets")
     video_subparsers = video_parser.add_subparsers(dest="video_command", required=True)
     video_get_parser = video_subparsers.add_parser("get", help="Read a video asset by URN")
@@ -190,15 +378,258 @@ def build_parser(*, explicit_post_actions: bool = False) -> argparse.ArgumentPar
     _add_api_version_argument(video_list_parser)
     video_list_parser.set_defaults(video_command="list")
 
+    organization_parser = subparsers.add_parser(
+        "organization",
+        help="Inspect LinkedIn organization access-control assignments",
+    )
+    organization_subparsers = organization_parser.add_subparsers(
+        dest="organization_command",
+        required=True,
+    )
+    organization_list_parser = organization_subparsers.add_parser(
+        "list",
+        help="List organization access rows for the authenticated viewer",
+    )
+    organization_list_parser.add_argument(
+        "--role",
+        help="Optional role filter for organization access records.",
+    )
+    organization_list_parser.add_argument(
+        "--state",
+        choices=ORGANIZATION_ACCESS_STATES,
+        help="Optional state filter for organization access records.",
+    )
+    organization_list_parser.add_argument(
+        "--count",
+        type=int,
+        default=100,
+        help="Number of access rows to fetch.",
+    )
+    organization_list_parser.add_argument(
+        "--start",
+        type=int,
+        default=0,
+        help="Pagination offset for access rows.",
+    )
+    _add_access_token_argument(organization_list_parser)
+    _add_api_version_argument(organization_list_parser)
+    organization_list_parser.set_defaults(organization_command="list")
+
+    organization_preflight_parser = organization_subparsers.add_parser(
+        "preflight",
+        help="Summarize whether the authenticated member can post as an organization",
+    )
+    organization_preflight_parser.add_argument(
+        "organization_urn",
+        help="Organization URN, for example urn:li:organization:2414183",
+    )
+    organization_preflight_parser.add_argument(
+        "--member",
+        help="Member URN, for example urn:li:person:abc123",
+    )
+    _add_access_token_argument(organization_preflight_parser)
+    _add_api_version_argument(organization_preflight_parser)
+    organization_preflight_parser.set_defaults(organization_command="preflight")
+
+    organization_members_parser = organization_subparsers.add_parser(
+        "members",
+        help="List members with access to an organization",
+    )
+    organization_members_parser.add_argument(
+        "organization_urn",
+        help="Organization URN, for example urn:li:organization:2414183",
+    )
+    organization_members_parser.add_argument(
+        "--role",
+        help="Optional role filter for organization access records.",
+    )
+    organization_members_parser.add_argument(
+        "--state",
+        choices=ORGANIZATION_ACCESS_STATES,
+        help="Optional state filter for organization access records.",
+    )
+    organization_members_parser.add_argument(
+        "--count",
+        type=int,
+        default=100,
+        help="Number of access rows to fetch.",
+    )
+    organization_members_parser.add_argument(
+        "--start",
+        type=int,
+        default=0,
+        help="Pagination offset for access rows.",
+    )
+    _add_access_token_argument(organization_members_parser)
+    _add_api_version_argument(organization_members_parser)
+    organization_members_parser.set_defaults(organization_command="members")
+
+    comment_parser = subparsers.add_parser("comment", help="Inspect LinkedIn comments")
+    comment_subparsers = comment_parser.add_subparsers(dest="comment_command", required=True)
+    comment_get_parser = comment_subparsers.add_parser("get", help="Read a comment by target URN and ID")
+    comment_get_parser.add_argument("target_urn", help="Root share or ugcPost URN for the social action")
+    comment_get_parser.add_argument("comment_id", help="Comment ID within the social action")
+    _add_access_token_argument(comment_get_parser)
+    _add_api_version_argument(comment_get_parser)
+    comment_get_parser.set_defaults(comment_command="get")
+    comment_create_parser = comment_subparsers.add_parser("create", help="Create a comment on a root entity")
+    comment_create_parser.add_argument("target_urn", help="Root share or ugcPost URN")
+    comment_create_parser.add_argument("--actor", required=True, help="Actor URN")
+    comment_create_parser.add_argument("--parent-comment", help="Optional parent comment URN for replies")
+    comment_create_parser.add_argument("--attributes-json", type=Path, help="Path to a JSON array of LinkedIn comment attributes")
+    comment_create_parser.add_argument("--content-image-urn", help="Existing LinkedIn image URN to attach to the comment")
+    comment_create_parser.add_argument("text", nargs="+", help="Comment text")
+    _add_access_token_argument(comment_create_parser)
+    _add_api_version_argument(comment_create_parser)
+    comment_create_parser.set_defaults(comment_command="create")
+    comment_list_parser = comment_subparsers.add_parser(
+        "list",
+        help="List comments for a root entity or comment URN",
+    )
+    comment_list_parser.add_argument("target_urn", help="Root share/post/comment URN")
+    comment_list_parser.add_argument("--count", type=int, default=10, help="Number of comments to fetch")
+    comment_list_parser.add_argument("--start", type=int, default=0, help="Pagination offset")
+    _add_access_token_argument(comment_list_parser)
+    _add_api_version_argument(comment_list_parser)
+    comment_list_parser.set_defaults(comment_command="list")
+    comment_batch_get_parser = comment_subparsers.add_parser(
+        "batch-get",
+        help="Read multiple comments under the same social action",
+    )
+    comment_batch_get_parser.add_argument("target_urn", help="Root share or comment URN")
+    comment_batch_get_parser.add_argument("comment_ids", nargs="+", help="One or more comment IDs")
+    _add_access_token_argument(comment_batch_get_parser)
+    _add_api_version_argument(comment_batch_get_parser)
+    comment_batch_get_parser.set_defaults(comment_command="batch-get")
+    comment_edit_parser = comment_subparsers.add_parser("edit", help="Edit a comment by ID")
+    comment_edit_parser.add_argument("target_urn", help="Root share or ugcPost URN for the social action")
+    comment_edit_parser.add_argument("comment_id", help="Comment ID within the social action")
+    comment_edit_parser.add_argument("--actor", help="Optional actor URN; required for some org flows")
+    comment_edit_parser.add_argument("--attributes-json", type=Path, help="Path to a JSON array of LinkedIn comment attributes")
+    comment_edit_parser.add_argument("--text", dest="comment_text", nargs="+", required=True, help="Replacement comment text")
+    _add_access_token_argument(comment_edit_parser)
+    _add_api_version_argument(comment_edit_parser)
+    comment_edit_parser.set_defaults(comment_command="edit")
+    comment_delete_parser = comment_subparsers.add_parser("delete", help="Delete a comment by ID")
+    comment_delete_parser.add_argument("target_urn", help="Root share or ugcPost URN for the social action")
+    comment_delete_parser.add_argument("comment_id", help="Comment ID within the social action")
+    comment_delete_parser.add_argument("--actor", help="Optional actor URN; required for some org flows")
+    _add_access_token_argument(comment_delete_parser)
+    _add_api_version_argument(comment_delete_parser)
+    comment_delete_parser.set_defaults(comment_command="delete")
+
+    reaction_parser = subparsers.add_parser("reaction", help="Create LinkedIn reactions")
+    reaction_subparsers = reaction_parser.add_subparsers(dest="reaction_command", required=True)
+    reaction_create_parser = reaction_subparsers.add_parser("create", help="Create a reaction on a root entity")
+    reaction_create_parser.add_argument("--actor", required=True, help="Actor URN, for example urn:li:person:abc123")
+    reaction_create_parser.add_argument("--root", required=True, help="Root URN, for example urn:li:share:123")
+    reaction_create_parser.add_argument(
+        "--type",
+        dest="reaction_type",
+        required=True,
+        help="LinkedIn reaction type, for example LIKE or PRAISE.",
+    )
+    _add_access_token_argument(reaction_create_parser)
+    _add_api_version_argument(reaction_create_parser)
+    reaction_create_parser.set_defaults(reaction_command="create")
+    reaction_get_parser = reaction_subparsers.add_parser("get", help="Read a reaction by actor/entity key")
+    reaction_get_parser.add_argument("--actor", required=True, help="Actor URN")
+    reaction_get_parser.add_argument("--entity", required=True, help="Entity URN")
+    _add_access_token_argument(reaction_get_parser)
+    _add_api_version_argument(reaction_get_parser)
+    reaction_get_parser.set_defaults(reaction_command="get")
+    reaction_list_parser = reaction_subparsers.add_parser("list", help="List reactions for one entity")
+    reaction_list_parser.add_argument("entity", help="Entity URN")
+    reaction_list_parser.add_argument("--count", type=int, default=10, help="Number of reactions to fetch")
+    reaction_list_parser.add_argument("--start", type=int, default=0, help="Pagination offset")
+    reaction_list_parser.add_argument(
+        "--sort",
+        choices=REACTION_SORT_OPTIONS,
+        default="REVERSE_CHRONOLOGICAL",
+        help="Reaction sort order.",
+    )
+    _add_access_token_argument(reaction_list_parser)
+    _add_api_version_argument(reaction_list_parser)
+    reaction_list_parser.set_defaults(reaction_command="list")
+    reaction_batch_get_parser = reaction_subparsers.add_parser(
+        "batch-get",
+        help="Read multiple reactions by actor/entity key",
+    )
+    reaction_batch_get_parser.add_argument(
+        "--key",
+        dest="reaction_keys",
+        action="append",
+        nargs=2,
+        metavar=("ACTOR_URN", "ENTITY_URN"),
+        required=True,
+        help="Reaction key pair; repeat the flag.",
+    )
+    _add_access_token_argument(reaction_batch_get_parser)
+    _add_api_version_argument(reaction_batch_get_parser)
+    reaction_batch_get_parser.set_defaults(reaction_command="batch-get")
+    reaction_delete_parser = reaction_subparsers.add_parser("delete", help="Delete a reaction by actor/entity key")
+    reaction_delete_parser.add_argument("--actor", required=True, help="Actor URN")
+    reaction_delete_parser.add_argument("--entity", required=True, help="Entity URN")
+    _add_access_token_argument(reaction_delete_parser)
+    _add_api_version_argument(reaction_delete_parser)
+    reaction_delete_parser.set_defaults(reaction_command="delete")
+
+    social_metadata_parser = subparsers.add_parser(
+        "social-metadata",
+        help="Inspect LinkedIn social metadata for a root entity",
+    )
+    social_metadata_subparsers = social_metadata_parser.add_subparsers(
+        dest="social_metadata_command",
+        required=True,
+    )
+    social_metadata_get_parser = social_metadata_subparsers.add_parser(
+        "get",
+        help="Read social metadata by entity URN",
+    )
+    social_metadata_get_parser.add_argument(
+        "entity_urn",
+        help="Entity URN, for example urn:li:share:123",
+    )
+    _add_access_token_argument(social_metadata_get_parser)
+    _add_api_version_argument(social_metadata_get_parser)
+    social_metadata_get_parser.set_defaults(social_metadata_command="get")
+    social_metadata_batch_get_parser = social_metadata_subparsers.add_parser(
+        "batch-get",
+        help="Read social metadata for multiple entity URNs",
+    )
+    social_metadata_batch_get_parser.add_argument("entity_urns", nargs="+", help="One or more entity URNs")
+    _add_access_token_argument(social_metadata_batch_get_parser)
+    _add_api_version_argument(social_metadata_batch_get_parser)
+    social_metadata_batch_get_parser.set_defaults(social_metadata_command="batch-get")
+    social_metadata_update_parser = social_metadata_subparsers.add_parser(
+        "set-comments-state",
+        help="Open or close comments on a thread; closing deletes existing comments",
+    )
+    social_metadata_update_parser.add_argument("entity_urn", help="Thread URN, for example a share or ugcPost URN")
+    social_metadata_update_parser.add_argument("--actor", required=True, help="Actor URN performing the update")
+    social_metadata_update_parser.add_argument(
+        "--state",
+        dest="comments_state",
+        choices=COMMENTS_STATE_OPTIONS,
+        required=True,
+        help="New comments state. LinkedIn deletes existing comments when switching to CLOSED.",
+    )
+    _add_access_token_argument(social_metadata_update_parser)
+    _add_api_version_argument(social_metadata_update_parser)
+    social_metadata_update_parser.set_defaults(social_metadata_command="set-comments-state")
+
     profile_parser = subparsers.add_parser("profile", help="Read supported LinkedIn profile data")
     profile_subparsers = profile_parser.add_subparsers(dest="profile_command", required=True)
     whoami_parser = profile_subparsers.add_parser("whoami", help="Read the authenticated member profile")
     whoami_parser.add_argument(
         "--source",
-        choices=("userinfo", "identity-me"),
+        choices=("userinfo", "profile-api", "identity-me"),
         default="userinfo",
         help="Official LinkedIn API source.",
     )
+    _add_access_token_argument(whoami_parser)
+    _add_api_version_argument(whoami_parser)
+    _add_identity_api_version_argument(whoami_parser)
     employment_parser = profile_subparsers.add_parser(
         "employment-history",
         help="Read employment data from supported LinkedIn profile APIs",
@@ -215,6 +646,9 @@ def build_parser(*, explicit_post_actions: bool = False) -> argparse.ArgumentPar
         default=5,
         help="Return only employment records overlapping the last N years.",
     )
+    _add_access_token_argument(employment_parser)
+    _add_api_version_argument(employment_parser)
+    _add_identity_api_version_argument(employment_parser)
     return parser
 
 
@@ -233,8 +667,18 @@ def main(
         return _run_post(args, environment, client_factory or _default_client_factory)
     if args.command == "image":
         return _run_image(args, environment, client_factory or _default_client_factory)
+    if args.command == "document":
+        return _run_document(args, environment, client_factory or _default_client_factory)
     if args.command == "video":
         return _run_video(args, environment, client_factory or _default_client_factory)
+    if args.command == "organization":
+        return _run_organization(args, environment, client_factory or _default_client_factory)
+    if args.command == "comment":
+        return _run_comment(args, environment, client_factory or _default_client_factory)
+    if args.command == "reaction":
+        return _run_reaction(args, environment, client_factory or _default_client_factory)
+    if args.command == "social-metadata":
+        return _run_social_metadata(args, environment, client_factory or _default_client_factory)
     if args.command == "profile" and args.profile_command == "whoami":
         return _run_profile_whoami(args, environment, client_factory or _default_client_factory)
     if args.command == "profile" and args.profile_command == "employment-history":
@@ -273,12 +717,76 @@ def _run_post(
         print("Missing required configuration: choose either an image or a video, not both.", file=sys.stderr)
         return 2
 
+    if post_command == "create" and args.reshare_post_urn and _post_create_has_attached_media(args):
+        print(
+            "Missing required configuration: reshare posts cannot also attach image or video media.",
+            file=sys.stderr,
+        )
+        return 2
+
     if post_command == "create" and args.image and args.image_urn:
         print("Missing required configuration: choose either an image path or an image URN, not both.", file=sys.stderr)
         return 2
 
+    if post_command == "create" and args.article_thumbnail and args.article_thumbnail_urn:
+        print(
+            "Missing required configuration: choose either an article thumbnail path or URN, not both.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if post_command == "create" and args.article_url and not args.article_title:
+        print("Missing required configuration: article posts require an article title.", file=sys.stderr)
+        return 2
+
+    if post_command == "create" and args.multi_image and args.multi_image_urn:
+        print(
+            "Missing required configuration: choose either multi-image paths or multi-image URNs, not both.",
+            file=sys.stderr,
+        )
+        return 2
+
     if post_command == "create" and args.video and args.video_urn:
         print("Missing required configuration: choose either a video path or a video URN, not both.", file=sys.stderr)
+        return 2
+
+    if post_command == "create" and (args.document or args.document_urn) and not args.document_title:
+        print("Missing required configuration: document posts require a document title.", file=sys.stderr)
+        return 2
+
+    if (
+        post_command == "create"
+        and args.multi_image
+        and not MIN_MULTI_IMAGE_COUNT <= len(args.multi_image) <= MAX_MULTI_IMAGE_COUNT
+    ):
+        print("Missing required configuration: multi-image posts require 2 to 20 images.", file=sys.stderr)
+        return 2
+
+    if (
+        post_command == "create"
+        and args.multi_image_urn
+        and not MIN_MULTI_IMAGE_COUNT <= len(args.multi_image_urn) <= MAX_MULTI_IMAGE_COUNT
+    ):
+        print("Missing required configuration: multi-image posts require 2 to 20 images.", file=sys.stderr)
+        return 2
+
+    if post_command == "create" and args.multi_image_alt_text:
+        total_images = len(args.multi_image or []) + len(args.multi_image_urn or [])
+        if total_images == 0:
+            print("Missing required configuration: multi-image alt text requires multi-image content.", file=sys.stderr)
+            return 2
+        if len(args.multi_image_alt_text) != total_images:
+            print(
+                "Missing required configuration: multi-image alt text count must match the number of images.",
+                file=sys.stderr,
+            )
+            return 2
+    if post_command == "create" and args.poll_question:
+        if len(args.poll_option or []) < 2:
+            print("Missing required configuration: poll posts require at least two poll options.", file=sys.stderr)
+            return 2
+    elif post_command == "create" and args.poll_option:
+        print("Missing required configuration: poll options require a poll question.", file=sys.stderr)
         return 2
 
     if post_command == "list" and args.count > POST_LIST_MAX_COUNT:
@@ -340,6 +848,7 @@ def _run_post(
                 commentary=args.edited_commentary,
                 content_call_to_action_label=args.cta_label,
                 content_landing_page=args.landing_page,
+                lifecycle_state=args.lifecycle_state,
             )
             print(f"Updated post {args.post_urn}")
             return 0
@@ -357,17 +866,9 @@ def _run_employment_history(
     env: Mapping[str, str],
     client_factory: ClientFactory,
 ) -> int:
-    access_token = _configured_value(None, env.get("LINKEDIN_ACCESS_TOKEN"))
-    api_version = _configured_value(None, env.get("LINKEDIN_API_VERSION")) or DEFAULT_API_VERSION
-
-    if access_token is None:
-        print("Missing required configuration: access token.", file=sys.stderr)
+    client = _configured_client(args, env, client_factory)
+    if client is None:
         return 2
-
-    client = cast(
-        LinkedInPostClient,
-        client_factory(access_token=access_token, api_version=api_version),
-    )
     try:
         if args.source == "identity-me":
             records = client.get_current_employment()
@@ -386,12 +887,33 @@ def _run_employment_history(
 
 def _add_post_create_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("commentary", nargs="+", help="Post text")
+    parser.add_argument("--poll-question", help="Question for a LinkedIn poll post")
+    parser.add_argument("--poll-option", action="append", help="Poll option text; repeat the flag")
+    parser.add_argument(
+        "--poll-duration",
+        default=None,
+        help="Poll duration token from the LinkedIn API. Defaults to THREE_DAYS.",
+    )
+    parser.add_argument("--reshare-post-urn", help="Existing LinkedIn post URN to reshare")
     parser.add_argument("--image", type=Path, help="Path to an image to upload and attach")
     parser.add_argument("--image-urn", help="Existing LinkedIn image asset URN to reuse")
+    parser.add_argument("--multi-image", action="append", type=Path, help="Path to an image for a multi-image post; repeat the flag")
+    parser.add_argument("--multi-image-urn", action="append", help="Existing LinkedIn image asset URN for a multi-image post; repeat the flag")
+    parser.add_argument("--multi-image-alt-text", action="append", help="Alt text for each multi-image entry; repeat in image order")
+    parser.add_argument("--document", type=Path, help="Path to a document to upload and attach")
+    parser.add_argument("--document-urn", help="Existing LinkedIn document asset URN to reuse")
+    parser.add_argument("--document-title", help="Title for the uploaded document")
+    parser.add_argument("--article-url", help="External article URL to attach")
+    parser.add_argument("--article-title", help="Title for the attached article")
+    parser.add_argument("--article-description", help="Description for the attached article")
+    parser.add_argument("--article-thumbnail", type=Path, help="Path to an image to upload for the article thumbnail")
+    parser.add_argument("--article-thumbnail-urn", help="Existing LinkedIn image asset URN for the article thumbnail")
     parser.add_argument("--alt-text", help="Alt text for the uploaded image")
     parser.add_argument("--video", type=Path, help="Path to a video to upload and attach")
     parser.add_argument("--video-urn", help="Existing LinkedIn video asset URN to reuse")
     parser.add_argument("--video-title", help="Title for the uploaded video")
+    parser.add_argument("--video-captions", type=Path, help="Path to a WebVTT captions file to upload with the video")
+    parser.add_argument("--video-thumbnail", type=Path, help="Path to an image thumbnail to upload with the video")
     parser.add_argument("--author", help="Author URN, for example urn:li:person:abc123")
     _add_access_token_argument(parser)
     _add_api_version_argument(parser)
@@ -407,6 +929,17 @@ def _add_api_version_argument(parser: argparse.ArgumentParser) -> None:
         "--api-version",
         default=None,
         help=f"LinkedIn API version in YYYYMM format. Defaults to {DEFAULT_API_VERSION}.",
+    )
+
+
+def _add_identity_api_version_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--identity-api-version",
+        default=None,
+        help=(
+            "Verified on LinkedIn `/rest/identityMe` release-track version, for example "
+            f"{DEFAULT_IDENTITY_API_VERSION}. Required when `--source identity-me` is used."
+        ),
     )
 
 
@@ -433,14 +966,38 @@ def _post_edit_has_changes(args: argparse.Namespace) -> bool:
             getattr(args, "edited_commentary", None),
             getattr(args, "cta_label", None),
             getattr(args, "landing_page", None),
+            getattr(args, "lifecycle_state", None),
         )
     )
 
 
 def _post_create_has_conflicting_media(args: argparse.Namespace) -> bool:
-    has_image = bool(args.image or args.image_urn)
-    has_video = bool(args.video or args.video_urn)
-    return has_image and has_video
+    sources = [
+        bool(args.poll_question),
+        bool(args.image or args.image_urn),
+        bool(args.multi_image or args.multi_image_urn),
+        bool(args.document or args.document_urn),
+        bool(args.article_url),
+        bool(args.video or args.video_urn),
+    ]
+    return sum(sources) > 1
+
+
+def _post_create_has_attached_media(args: argparse.Namespace) -> bool:
+    return bool(
+        args.poll_question
+        or args.multi_image_urn
+        or args.multi_image_alt_text
+        or
+        args.image
+        or args.image_urn
+        or args.multi_image
+        or args.document
+        or args.document_urn
+        or args.video
+        or args.video_urn
+        or args.article_url
+    )
 
 
 def _configured_value(cli_value: str | None, env_value: str | None) -> str | None:
@@ -450,6 +1007,10 @@ def _configured_value(cli_value: str | None, env_value: str | None) -> str | Non
     return None
 
 
+def _read_json_file(path: Path) -> object:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def _create_post(
     client: LinkedInPostClient,
     args: argparse.Namespace,
@@ -457,6 +1018,38 @@ def _create_post(
     author: str,
 ) -> object:
     commentary = " ".join(args.commentary)
+    if args.poll_question:
+        return client.create_poll_post(
+            author=author,
+            commentary=commentary,
+            visibility=args.visibility,
+            question=args.poll_question,
+            options=args.poll_option or [],
+            duration=args.poll_duration or "THREE_DAYS",
+        )
+    if args.reshare_post_urn:
+        return client.create_reshare_post(
+            author=author,
+            commentary=commentary,
+            visibility=args.visibility,
+            reshared_post_urn=args.reshare_post_urn,
+        )
+    if args.multi_image:
+        return client.create_multi_image_post(
+            author=author,
+            commentary=commentary,
+            visibility=args.visibility,
+            image_paths=args.multi_image,
+            alt_texts=args.multi_image_alt_text,
+        )
+    if args.multi_image_urn:
+        return client.create_multi_image_post_from_assets(
+            author=author,
+            commentary=commentary,
+            visibility=args.visibility,
+            image_urns=args.multi_image_urn,
+            alt_texts=args.multi_image_alt_text,
+        )
     if args.image:
         return client.create_image_post(
             author=author,
@@ -473,7 +1066,44 @@ def _create_post(
             image_urn=args.image_urn,
             alt_text=args.alt_text,
         )
+    if args.document:
+        return client.create_document_post(
+            author=author,
+            commentary=commentary,
+            visibility=args.visibility,
+            document_path=args.document,
+            title=args.document_title,
+        )
+    if args.document_urn:
+        return client.create_document_post_from_asset(
+            author=author,
+            commentary=commentary,
+            visibility=args.visibility,
+            document_urn=args.document_urn,
+            title=args.document_title,
+        )
+    if args.article_url:
+        return client.create_article_post(
+            author=author,
+            commentary=commentary,
+            visibility=args.visibility,
+            article_url=args.article_url,
+            title=args.article_title,
+            description=args.article_description,
+            thumbnail_image_path=args.article_thumbnail,
+            thumbnail_image_urn=args.article_thumbnail_urn,
+        )
     if args.video:
+        if args.video_captions is not None or args.video_thumbnail is not None:
+            return client.create_video_post(
+                author=author,
+                commentary=commentary,
+                visibility=args.visibility,
+                video_path=args.video,
+                title=args.video_title,
+                captions_path=args.video_captions,
+                thumbnail_path=args.video_thumbnail,
+            )
         return client.create_video_post(
             author=author,
             commentary=commentary,
@@ -520,6 +1150,30 @@ def _run_image(
         _close_client(client)
 
 
+def _run_document(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> int:
+    client = _configured_client(args, env, client_factory)
+    if client is None:
+        return 2
+
+    try:
+        if args.document_command == "get":
+            print(json.dumps(client.get_document(args.document_urn), indent=2))
+            return 0
+        if args.document_command == "list":
+            print(json.dumps(client.batch_get_documents(args.document_urns), indent=2))
+            return 0
+        raise AssertionError(f"Unsupported document command: {args.document_command}")
+    except LinkedInApiError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        _close_client(client)
+
+
 def _run_video(
     args: argparse.Namespace,
     env: Mapping[str, str],
@@ -544,6 +1198,252 @@ def _run_video(
         _close_client(client)
 
 
+def _run_organization(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> int:
+    if args.organization_command == "preflight":
+        member_urn = _configured_value(getattr(args, "member", None), env.get("LINKEDIN_MEMBER_URN"))
+        if member_urn is None:
+            print("Missing required configuration: member URN.", file=sys.stderr)
+            return 2
+
+    client = _configured_client(args, env, client_factory)
+    if client is None:
+        return 2
+
+    try:
+        if args.organization_command == "list":
+            result = client.list_organization_access(
+                count=args.count,
+                start=args.start,
+                role=args.role,
+                state=args.state,
+            )
+            print(json.dumps(result, indent=2))
+            return 0
+        if args.organization_command == "preflight":
+            result = client.preflight_organization_author(
+                role_assignee=member_urn,
+                organization=args.organization_urn,
+            )
+            print(json.dumps(result, indent=2))
+            return 0
+        if args.organization_command == "members":
+            result = client.list_organization_access_by_organization(
+                organization=args.organization_urn,
+                count=args.count,
+                start=args.start,
+                role=args.role,
+                state=args.state,
+            )
+            print(json.dumps(result, indent=2))
+            return 0
+        raise AssertionError(f"Unsupported organization command: {args.organization_command}")
+    except LinkedInApiError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        _close_client(client)
+
+
+def _run_comment(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> int:
+    if args.comment_command == "create" and args.parent_comment and args.content_image_urn:
+        print(
+            "Missing required configuration: reply comments cannot attach content entities.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if args.comment_command in {"edit", "delete"} and _is_comment_urn(args.target_urn):
+        print(
+            "Missing required configuration: comment updates and deletes require a share or ugcPost URN, not a comment URN.",
+            file=sys.stderr,
+        )
+        return 2
+
+    client = _configured_client(args, env, client_factory)
+    if client is None:
+        return 2
+
+    try:
+        if args.comment_command == "create":
+            print(
+                json.dumps(
+                    client.create_comment(
+                        target_urn=args.target_urn,
+                        actor=args.actor,
+                        text=" ".join(args.text),
+                        parent_comment=args.parent_comment,
+                        attributes=cast(
+                            list[dict[str, object]] | None,
+                            _read_json_file(args.attributes_json) if args.attributes_json else None,
+                        ),
+                        content_image_urn=args.content_image_urn,
+                    ),
+                    indent=2,
+                )
+            )
+            return 0
+        if args.comment_command == "get":
+            print(json.dumps(client.get_comment(args.target_urn, args.comment_id), indent=2))
+            return 0
+        if args.comment_command == "list":
+            print(
+                json.dumps(
+                    client.list_comments(
+                        target_urn=args.target_urn,
+                        count=args.count,
+                        start=args.start,
+                    ),
+                    indent=2,
+                )
+            )
+            return 0
+        if args.comment_command == "batch-get":
+            print(json.dumps(client.batch_get_comments(args.target_urn, args.comment_ids), indent=2))
+            return 0
+        if args.comment_command == "edit":
+            client.update_comment(
+                target_urn=args.target_urn,
+                comment_id=args.comment_id,
+                text=" ".join(args.comment_text),
+                actor=args.actor,
+                attributes=cast(
+                    list[dict[str, object]] | None,
+                    _read_json_file(args.attributes_json) if args.attributes_json else None,
+                ),
+            )
+            print(f"Updated comment {args.comment_id}")
+            return 0
+        if args.comment_command == "delete":
+            client.delete_comment(
+                target_urn=args.target_urn,
+                comment_id=args.comment_id,
+                actor=args.actor,
+            )
+            print(f"Deleted comment {args.comment_id}")
+            return 0
+        raise AssertionError(f"Unsupported comment command: {args.comment_command}")
+    except LinkedInApiError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        _close_client(client)
+
+
+def _run_reaction(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> int:
+    client = _configured_client(args, env, client_factory)
+    if client is None:
+        return 2
+
+    try:
+        if args.reaction_command == "create":
+            print(
+                json.dumps(
+                    client.create_reaction(
+                        actor=args.actor,
+                        root=args.root,
+                        reaction_type=args.reaction_type,
+                    ),
+                    indent=2,
+                )
+            )
+            return 0
+        if args.reaction_command == "get":
+            print(
+                json.dumps(
+                    client.get_reaction(
+                        actor=args.actor,
+                        entity=args.entity,
+                    ),
+                    indent=2,
+                )
+            )
+            return 0
+        if args.reaction_command == "list":
+            print(
+                json.dumps(
+                    client.list_reactions(
+                        entity=args.entity,
+                        count=args.count,
+                        start=args.start,
+                        sort=args.sort,
+                    ),
+                    indent=2,
+                )
+            )
+            return 0
+        if args.reaction_command == "batch-get":
+            print(
+                json.dumps(
+                    client.batch_get_reactions(
+                        [(actor, entity) for actor, entity in args.reaction_keys]
+                    ),
+                    indent=2,
+                )
+            )
+            return 0
+        if args.reaction_command == "delete":
+            client.delete_reaction(actor=args.actor, entity=args.entity)
+            print(f"Deleted reaction {args.actor} -> {args.entity}")
+            return 0
+        raise AssertionError(f"Unsupported reaction command: {args.reaction_command}")
+    except LinkedInApiError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        _close_client(client)
+
+
+def _run_social_metadata(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    client_factory: ClientFactory,
+) -> int:
+    if args.social_metadata_command == "set-comments-state" and _is_comment_urn(args.entity_urn):
+        print(
+            "Missing required configuration: comments-state updates require a thread URN, not a comment URN.",
+            file=sys.stderr,
+        )
+        return 2
+
+    client = _configured_client(args, env, client_factory)
+    if client is None:
+        return 2
+
+    try:
+        if args.social_metadata_command == "get":
+            print(json.dumps(client.get_social_metadata(args.entity_urn), indent=2))
+            return 0
+        if args.social_metadata_command == "batch-get":
+            print(json.dumps(client.batch_get_social_metadata(args.entity_urns), indent=2))
+            return 0
+        if args.social_metadata_command == "set-comments-state":
+            client.update_social_metadata_comments_state(
+                entity_urn=args.entity_urn,
+                actor=args.actor,
+                comments_state=args.comments_state,
+            )
+            print(f"Updated social metadata {args.entity_urn}")
+            return 0
+        raise AssertionError(f"Unsupported social metadata command: {args.social_metadata_command}")
+    except LinkedInApiError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        _close_client(client)
+
+
 def _run_profile_whoami(
     args: argparse.Namespace,
     env: Mapping[str, str],
@@ -556,6 +1456,16 @@ def _run_profile_whoami(
     try:
         if args.source == "identity-me":
             result = client.get_identity_profile()
+            member_id = result.get("id")
+            if isinstance(member_id, str) and member_id:
+                result = dict(result)
+                result["person_urn"] = f"urn:li:person:{member_id}"
+        elif args.source == "profile-api":
+            result = client.get_profile_identity()
+            member_id = result.get("id")
+            if isinstance(member_id, str) and member_id:
+                result = dict(result)
+                result["person_urn"] = f"urn:li:person:{member_id}"
         else:
             result = client.get_userinfo()
             sub = result.get("sub")
@@ -578,12 +1488,31 @@ def _configured_client(
 ) -> LinkedInPostClient | None:
     access_token = _configured_value(getattr(args, "access_token", None), env.get("LINKEDIN_ACCESS_TOKEN"))
     api_version = _configured_value(getattr(args, "api_version", None), env.get("LINKEDIN_API_VERSION"))
+    identity_api_version = _configured_value(
+        getattr(args, "identity_api_version", None),
+        env.get("LINKEDIN_IDENTITY_API_VERSION"),
+    )
     if access_token is None:
         print("Missing required configuration: access token.", file=sys.stderr)
         return None
+    if getattr(args, "source", None) == "identity-me" and identity_api_version is None:
+        print(
+            "Missing required configuration: identity API version.",
+            file=sys.stderr,
+        )
+        return None
+    factory_kwargs: dict[str, str] = {
+        "access_token": access_token,
+        "api_version": api_version or DEFAULT_API_VERSION,
+    }
+    if identity_api_version is not None and _client_factory_accepts_kwarg(
+        client_factory,
+        "identity_api_version",
+    ):
+        factory_kwargs["identity_api_version"] = identity_api_version
     return cast(
         LinkedInPostClient,
-        client_factory(access_token=access_token, api_version=api_version or DEFAULT_API_VERSION),
+        client_factory(**factory_kwargs),
     )
 
 
@@ -593,5 +1522,28 @@ def _close_client(client: LinkedInPostClient) -> None:
         close()
 
 
-def _default_client_factory(*, access_token: str, api_version: str) -> LinkedInClient:
-    return LinkedInClient(access_token=access_token, api_version=api_version)
+def _is_comment_urn(urn: str) -> bool:
+    return urn.startswith("urn:li:comment:")
+
+
+def _client_factory_accepts_kwarg(factory: ClientFactory, kwarg: str) -> bool:
+    signature = inspect.signature(factory)
+    if kwarg in signature.parameters:
+        return True
+    return any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
+
+
+def _default_client_factory(
+    *,
+    access_token: str,
+    api_version: str,
+    identity_api_version: str | None = None,
+) -> LinkedInClient:
+    return LinkedInClient(
+        access_token=access_token,
+        api_version=api_version,
+        identity_api_version=identity_api_version,
+    )
