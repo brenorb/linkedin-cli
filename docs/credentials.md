@@ -13,14 +13,14 @@ Some commands also use:
 Recommended local setup:
 
 ```bash
-mkdir -p ~/.config/licli
-chmod 700 ~/.config/licli
+mkdir -p ~/.config/lkdn
+chmod 700 ~/.config/lkdn
 ```
 
 Store secrets in a local shell file that is not part of the repo:
 
 ```bash
-cat > ~/.config/licli/env.sh <<'EOF'
+cat > ~/.config/lkdn/env.sh <<'EOF'
 export LINKEDIN_CLIENT_ID='YOUR_CLIENT_ID'
 export LINKEDIN_CLIENT_SECRET='YOUR_CLIENT_SECRET'
 export LINKEDIN_REDIRECT_URI='http://localhost:8000/callback'
@@ -38,18 +38,18 @@ export LINKEDIN_API_VERSION='202606'
 export LINKEDIN_IDENTITY_API_VERSION='202510.03'
 EOF
 
-chmod 600 ~/.config/licli/env.sh
+chmod 600 ~/.config/lkdn/env.sh
 ```
 
 Load it when needed:
 
 ```bash
-source ~/.config/licli/env.sh
+source ~/.config/lkdn/env.sh
 ```
 
 Good storage options:
 
-- `~/.config/licli/env.sh`
+- `~/.config/lkdn/env.sh`
 - `~/.zshrc` if you want values loaded in every shell
 - another local secrets file that you source manually
 
@@ -61,8 +61,8 @@ Avoid storing tokens in tracked repo files.
 - `LINKEDIN_MEMBER_URN` should stay in member form, for example `urn:li:person:abc123`, because `organization preflight` uses it to build the official `organizationAuthorizations` impersonator key. It must match the authenticated viewer.
 - `post get` and `post delete` do not read `LINKEDIN_AUTHOR_URN`; they only need the post URN plus `LINKEDIN_ACCESS_TOKEN`.
 - `comment get`, `reaction create`, and `social-metadata get` also do not read `LINKEDIN_AUTHOR_URN`.
-- `uv run licli profile whoami` is the fastest way in this repo to derive the member-form `LINKEDIN_AUTHOR_URN` from OIDC `userinfo`.
-- `uv run licli organization preflight "urn:li:organization:123456"` is the fastest way in this repo to confirm whether the current member URN can create, read-as-author, edit, or delete organic org posts.
+- `uv run lkdn profile whoami` is the fastest way in this repo to derive the member-form `LINKEDIN_AUTHOR_URN` from OIDC `userinfo`.
+- `uv run lkdn organization preflight "urn:li:organization:123456"` is the fastest way in this repo to confirm whether the current member URN can create, read-as-author, edit, or delete organic org posts.
 - `LINKEDIN_API_VERSION` must use `YYYYMM`.
 - A value such as `20250501` is invalid and will cause `426 Requested version ... is not active`.
 - Active versions change over time. If a version stops working, update it to a currently active `YYYYMM`.
@@ -82,4 +82,4 @@ Avoid storing tokens in tracked repo files.
 
 See [onboarding.md](onboarding.md) for the full step-by-step setup flow.
 
-The published PyPI package is `lkdn`. The CLI entrypoints are `licli`, `lkdn`, and `linkedin`.
+The published PyPI package is `lkdn`. The documented command names are `lkdn` and `linkedin`.

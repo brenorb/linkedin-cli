@@ -2,7 +2,7 @@
 
 This guide walks through the full member-posting setup for `lkdn` without exposing your token to anyone else.
 
-The published PyPI package is `lkdn`. The installed command aliases are `licli`, `lkdn`, and `linkedin`.
+The published PyPI package is `lkdn`. The documented command names are `lkdn` and `linkedin`.
 
 It covers:
 
@@ -46,28 +46,28 @@ Post-management support also splits along member versus organization and read ve
 
 | Command | Works for member URNs | Works for organization URNs | Required scope family |
 | --- | --- | --- | --- |
-| `licli post ...` / `licli post create ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
-| `licli post --poll-question ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
-| `licli post --reshare-post-urn ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
-| `licli post --article-url ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
-| `licli post --document ...` | Yes | Yes, but org-owned uploads are stricter | `w_member_social` for members, `w_organization_social` for organizations |
-| `licli post --multi-image ...` | Yes | Yes, for the post itself | `w_member_social` for members, `w_organization_social` for organizations; company-owned image uploads can additionally require `ADMINISTRATOR` or `DIRECT_SPONSORED_CONTENT_POSTER` |
-| `licli post --multi-image-urn ...` | Yes | Yes, for the post itself | `w_member_social` for members, `w_organization_social` for organizations; org-owned image assets still follow LinkedIn's stricter image-owner rules |
-| `licli post edit <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
-| `licli post delete <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
-| `licli post get <post-urn>` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
-| `licli post batch-get <post-urn>...` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
-| `licli post list [--author ...]` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
-| `licli comment get ...` / `licli comment list ...` / `licli comment batch-get ...` | Only when LinkedIn has granted restricted member feed-read access | Yes, when your app has organization feed-read access | `r_member_social_feed` for members, `r_organization_social_feed` for organizations |
-| `licli comment create ...` / `licli comment edit ...` / `licli comment delete ...` | Yes | Yes | `w_member_social_feed` for members, `w_organization_social_feed` for organizations |
-| `licli reaction create ...` / `licli reaction delete ...` | Yes | Yes | `w_member_social_feed` for members, `w_organization_social_feed` for organizations |
-| `licli reaction get ...` / `licli reaction list ...` / `licli reaction batch-get ...` | Only when LinkedIn has granted restricted member feed-read access | Yes, when your app has organization feed-read access | `r_member_social_feed` for members, `r_organization_social_feed` for organizations |
-| `licli social-metadata get ...` / `licli social-metadata batch-get ...` | Only when LinkedIn has granted restricted member feed-read access | Yes, when your app has organization feed-read access | `r_member_social_feed` for members, `r_organization_social_feed` for organizations |
-| `licli social-metadata set-comments-state ...` | Yes | Yes | `w_member_social_feed` for members, `w_organization_social_feed` for organizations; closing a thread deletes its existing comments |
-| `licli document get ...` / `licli document list ...` | Person-owned reads require owner access | Company-owned reads require stronger org access | LinkedIn documents company-owned document GETs for `ADMINISTRATOR` or `DIRECT_SPONSORED_CONTENT_POSTER`, plus separate sponsored-account flows |
-| `licli organization list` / `licli organization members` | Uses the authenticated viewer/admin context to inspect org access | N/A | `r_organization_admin` or `rw_organization_admin` |
-| `licli organization preflight` | Uses the authenticated viewer plus a matching member URN to inspect one org's post-management authorization state | N/A | Restricted `rw_organization_admin` plus ACL discovery access; does not verify separate Posts API OAuth scopes |
-| `licli profile whoami` | Works with OIDC `userinfo`, `profile-api`, or `identity-me` depending on your app access | N/A | `userinfo` uses `openid profile`; `profile-api` uses `/v2/me`; `identity-me` needs the Verified on LinkedIn product plus `r_profile_basicinfo`, and it follows a separate release track from the `YYYYMM` Marketing API versions. |
+| `lkdn post ...` / `lkdn post create ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `lkdn post --poll-question ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `lkdn post --reshare-post-urn ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `lkdn post --article-url ...` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `lkdn post --document ...` | Yes | Yes, but org-owned uploads are stricter | `w_member_social` for members, `w_organization_social` for organizations |
+| `lkdn post --multi-image ...` | Yes | Yes, for the post itself | `w_member_social` for members, `w_organization_social` for organizations; company-owned image uploads can additionally require `ADMINISTRATOR` or `DIRECT_SPONSORED_CONTENT_POSTER` |
+| `lkdn post --multi-image-urn ...` | Yes | Yes, for the post itself | `w_member_social` for members, `w_organization_social` for organizations; org-owned image assets still follow LinkedIn's stricter image-owner rules |
+| `lkdn post edit <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `lkdn post delete <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `lkdn post get <post-urn>` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
+| `lkdn post batch-get <post-urn>...` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
+| `lkdn post list [--author ...]` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
+| `lkdn comment get ...` / `lkdn comment list ...` / `lkdn comment batch-get ...` | Only when LinkedIn has granted restricted member feed-read access | Yes, when your app has organization feed-read access | `r_member_social_feed` for members, `r_organization_social_feed` for organizations |
+| `lkdn comment create ...` / `lkdn comment edit ...` / `lkdn comment delete ...` | Yes | Yes | `w_member_social_feed` for members, `w_organization_social_feed` for organizations |
+| `lkdn reaction create ...` / `lkdn reaction delete ...` | Yes | Yes | `w_member_social_feed` for members, `w_organization_social_feed` for organizations |
+| `lkdn reaction get ...` / `lkdn reaction list ...` / `lkdn reaction batch-get ...` | Only when LinkedIn has granted restricted member feed-read access | Yes, when your app has organization feed-read access | `r_member_social_feed` for members, `r_organization_social_feed` for organizations |
+| `lkdn social-metadata get ...` / `lkdn social-metadata batch-get ...` | Only when LinkedIn has granted restricted member feed-read access | Yes, when your app has organization feed-read access | `r_member_social_feed` for members, `r_organization_social_feed` for organizations |
+| `lkdn social-metadata set-comments-state ...` | Yes | Yes | `w_member_social_feed` for members, `w_organization_social_feed` for organizations; closing a thread deletes its existing comments |
+| `lkdn document get ...` / `lkdn document list ...` | Person-owned reads require owner access | Company-owned reads require stronger org access | LinkedIn documents company-owned document GETs for `ADMINISTRATOR` or `DIRECT_SPONSORED_CONTENT_POSTER`, plus separate sponsored-account flows |
+| `lkdn organization list` / `lkdn organization members` | Uses the authenticated viewer/admin context to inspect org access | N/A | `r_organization_admin` or `rw_organization_admin` |
+| `lkdn organization preflight` | Uses the authenticated viewer plus a matching member URN to inspect one org's post-management authorization state | N/A | Restricted `rw_organization_admin` plus ACL discovery access; does not verify separate Posts API OAuth scopes |
+| `lkdn profile whoami` | Works with OIDC `userinfo`, `profile-api`, or `identity-me` depending on your app access | N/A | `userinfo` uses `openid profile`; `profile-api` uses `/v2/me`; `identity-me` needs the Verified on LinkedIn product plus `r_profile_basicinfo`, and it follows a separate release track from the `YYYYMM` Marketing API versions. |
 
 Notes:
 
@@ -95,10 +95,10 @@ Notes:
 - `comment edit`, `comment delete`, and `social-metadata set-comments-state` are intentionally stricter about thread targeting than read commands: they require a thread URN, not a comment URN.
 - `social-metadata set-comments-state --state CLOSED` is destructive on the official API: LinkedIn deletes the thread's existing comments when it closes comments.
 - For organization authors, feed-write roles are not identical to org post-write roles. LinkedIn documents `RECRUITING_POSTER` on the feed-write side, while org post creation/editing uses the separate content-admin/posting role model.
-- LinkedIn's current Posts API models mentions and annotations inline in the commentary text itself, so `licli` keeps commentary input as text rather than inventing a second mention DSL.
-- For comment write operations, `licli` exposes the official mention/content payloads through `--attributes-json` and `--content-image-urn` instead of inventing a bespoke mention syntax.
+- LinkedIn's current Posts API models mentions and annotations inline in the commentary text itself, so `lkdn` keeps commentary input as text rather than inventing a second mention DSL.
+- For comment write operations, `lkdn` exposes the official mention/content payloads through `--attributes-json` and `--content-image-urn` instead of inventing a bespoke mention syntax.
 - `organization preflight` is deliberately an organic-post capability helper. It does not promise that company-owned image/video/document uploads will succeed, because LinkedIn documents stricter asset-upload role gates for those APIs.
-- If your post text starts with `create`, `get`, `list`, or `delete`, use `licli post create "..."` to avoid ambiguity.
+- If your post text starts with `create`, `get`, `list`, or `delete`, use `lkdn post create "..."` to avoid ambiguity.
 
 ## Prerequisites
 
@@ -140,12 +140,12 @@ If the redirect URI used during token exchange does not exactly match the one us
 Create a local env file:
 
 ```bash
-mkdir -p ~/.config/licli
-chmod 700 ~/.config/licli
+mkdir -p ~/.config/lkdn
+chmod 700 ~/.config/lkdn
 ```
 
 ```bash
-cat > ~/.config/licli/env.sh <<'EOF'
+cat > ~/.config/lkdn/env.sh <<'EOF'
 export LINKEDIN_CLIENT_ID='YOUR_CLIENT_ID'
 export LINKEDIN_CLIENT_SECRET='YOUR_CLIENT_SECRET'
 export LINKEDIN_REDIRECT_URI='http://localhost:8000/callback'
@@ -154,8 +154,8 @@ export LINKEDIN_API_VERSION='202606'
 export LINKEDIN_IDENTITY_API_VERSION='202510.03'
 EOF
 
-chmod 600 ~/.config/licli/env.sh
-source ~/.config/licli/env.sh
+chmod 600 ~/.config/lkdn/env.sh
+source ~/.config/lkdn/env.sh
 ```
 
 If you are preparing an organization-author flow, request the organization scopes that your app has actually been approved for. The common split is:
@@ -262,9 +262,9 @@ print(json.load(sys.stdin)["access_token"])
 PY
 )
 
-printf "export LINKEDIN_ACCESS_TOKEN='%s'\n" "$LINKEDIN_ACCESS_TOKEN" >> ~/.config/licli/env.sh
-chmod 600 ~/.config/licli/env.sh
-source ~/.config/licli/env.sh
+printf "export LINKEDIN_ACCESS_TOKEN='%s'\n" "$LINKEDIN_ACCESS_TOKEN" >> ~/.config/lkdn/env.sh
+chmod 600 ~/.config/lkdn/env.sh
+source ~/.config/lkdn/env.sh
 ```
 
 If `id_token` is present, save it too:
@@ -278,8 +278,8 @@ PY
 )
 
 if [ -n "$LINKEDIN_ID_TOKEN" ]; then
-  printf "export LINKEDIN_ID_TOKEN='%s'\n" "$LINKEDIN_ID_TOKEN" >> ~/.config/licli/env.sh
-  source ~/.config/licli/env.sh
+  printf "export LINKEDIN_ID_TOKEN='%s'\n" "$LINKEDIN_ID_TOKEN" >> ~/.config/lkdn/env.sh
+  source ~/.config/lkdn/env.sh
 fi
 ```
 
@@ -308,8 +308,8 @@ print(json.load(sys.stdin)["sub"])
 PY
 )
 
-printf "export LINKEDIN_AUTHOR_URN='urn:li:person:%s'\n" "$LINKEDIN_PERSON_ID" >> ~/.config/licli/env.sh
-source ~/.config/licli/env.sh
+printf "export LINKEDIN_AUTHOR_URN='urn:li:person:%s'\n" "$LINKEDIN_PERSON_ID" >> ~/.config/lkdn/env.sh
+source ~/.config/lkdn/env.sh
 ```
 
 ### Organization author URNs
@@ -350,8 +350,8 @@ print(data["sub"])
 PY
 )
 
-printf "export LINKEDIN_AUTHOR_URN='urn:li:person:%s'\n" "$LINKEDIN_PERSON_ID" >> ~/.config/licli/env.sh
-source ~/.config/licli/env.sh
+printf "export LINKEDIN_AUTHOR_URN='urn:li:person:%s'\n" "$LINKEDIN_PERSON_ID" >> ~/.config/lkdn/env.sh
+source ~/.config/lkdn/env.sh
 ```
 
 ## 7. Verify the final environment
@@ -372,7 +372,7 @@ Expected:
 You can also verify the authenticated member identity directly:
 
 ```bash
-uv run licli profile whoami
+uv run lkdn profile whoami
 ```
 
 That command calls OIDC `userinfo` by default and prints a derived `person_urn` that you can reuse as `LINKEDIN_AUTHOR_URN` for member posts.
@@ -380,13 +380,13 @@ That command calls OIDC `userinfo` by default and prints a derived `person_urn` 
 If your app has Profile API access, you can use the older identity source directly:
 
 ```bash
-uv run licli profile whoami --source profile-api
+uv run lkdn profile whoami --source profile-api
 ```
 
 If your app has Verified on LinkedIn profile access, you can also force the alternate source:
 
 ```bash
-uv run licli profile whoami --source identity-me --identity-api-version 202510.03
+uv run lkdn profile whoami --source identity-me --identity-api-version 202510.03
 ```
 
 If LinkedIn returns `403 No valid API product assigned`, add the `Verified on LinkedIn` product to the app; scopes alone are not enough for `/rest/identityMe`.
@@ -397,18 +397,18 @@ It does not list organizations you can act for. LinkedIn treats that as an organ
 
 ```bash
 cd /Users/breno/Documents/code/PROJECTS/linkedin-cli
-source ~/.config/licli/env.sh
+source ~/.config/lkdn/env.sh
 
-uv run licli post "Hello from the LinkedIn Posts API"
+uv run lkdn post "Hello from the LinkedIn Posts API"
 ```
 
 ## 9. Post an image post
 
 ```bash
 cd /Users/breno/Documents/code/PROJECTS/linkedin-cli
-source ~/.config/licli/env.sh
+source ~/.config/lkdn/env.sh
 
-uv run licli post \
+uv run lkdn post \
   --image /absolute/path/to/banner.png \
   --alt-text "Descriptive alt text" \
   "Hello from the LinkedIn Posts API"
@@ -418,9 +418,9 @@ uv run licli post \
 
 ```bash
 cd /Users/breno/Documents/code/PROJECTS/linkedin-cli
-source ~/.config/licli/env.sh
+source ~/.config/lkdn/env.sh
 
-uv run licli post \
+uv run lkdn post \
   --video /absolute/path/to/clip.mp4 \
   --video-title "Linus on abstraction" \
   "Hello from the LinkedIn Posts API"
@@ -493,10 +493,10 @@ If you hit this error:
 If the CLI works with:
 
 ```bash
-uv run licli post --api-version 202604 ...
+uv run lkdn post --api-version 202604 ...
 ```
 
-then your local env file still has an invalid or stale version. Update `~/.config/licli/env.sh`.
+then your local env file still has an invalid or stale version. Update `~/.config/lkdn/env.sh`.
 
 ## Official docs
 

@@ -34,9 +34,8 @@ uv sync
 
 PyPI distribution: `lkdn`
 
-Command aliases:
+Command names:
 
-- `licli`
 - `lkdn`
 - `linkedin`
 
@@ -53,19 +52,19 @@ export LINKEDIN_API_VERSION="YYYYMM"
 Then publish a post:
 
 ```bash
-uv run licli post "Hello from the new Posts API"
+uv run lkdn post "Hello from the new Posts API"
 ```
 
 The legacy `post` create flow still works, and there is now an explicit alias:
 
 ```bash
-uv run licli post create "Hello from the new Posts API"
+uv run lkdn post create "Hello from the new Posts API"
 ```
 
 Publish a post with an image:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --image /absolute/path/to/banner.png \
   --alt-text "Bitdevs BSB event banner" \
   "Hello from the new Posts API"
@@ -74,7 +73,7 @@ uv run licli post \
 Publish a post with a video:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --video /absolute/path/to/clip.mp4 \
   --video-title "Linus on abstraction" \
   "Hello from the new Posts API"
@@ -83,7 +82,7 @@ uv run licli post \
 Publish a post with a video, captions, and a custom thumbnail:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --video /absolute/path/to/clip.mp4 \
   --video-title "Linus on abstraction" \
   --video-captions /absolute/path/to/clip.vtt \
@@ -94,7 +93,7 @@ uv run licli post \
 Publish a post with a document:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --document /absolute/path/to/deck.pdf \
   --document-title "June deck" \
   "Hello from the new Posts API"
@@ -103,7 +102,7 @@ uv run licli post \
 Publish a post with an external article:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --article-url "https://example.com/post" \
   --article-title "Deep systems" \
   --article-description "A long read" \
@@ -114,7 +113,7 @@ uv run licli post \
 Or upload the article thumbnail from a local file instead of reusing a URN:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --article-url "https://example.com/post" \
   --article-title "Deep systems" \
   --article-thumbnail /absolute/path/to/thumb.png \
@@ -124,7 +123,7 @@ uv run licli post \
 Publish a multi-image post:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --multi-image /absolute/path/to/one.png \
   --multi-image /absolute/path/to/two.png \
   --multi-image-alt-text "First image" \
@@ -135,7 +134,7 @@ uv run licli post \
 Publish a poll post:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --poll-question "Favorite color?" \
   --poll-option "Red" \
   --poll-option "Blue" \
@@ -146,7 +145,7 @@ uv run licli post \
 Reuse existing image URNs for a multi-image post with per-image alt text:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --multi-image-urn "urn:li:image:123456" \
   --multi-image-urn "urn:li:image:789012" \
   --multi-image-alt-text "First image" \
@@ -157,7 +156,7 @@ uv run licli post \
 Reshare an existing post:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --reshare-post-urn "urn:li:share:123456789" \
   "Worth reading"
 ```
@@ -165,21 +164,21 @@ uv run licli post \
 Reuse an existing uploaded image or video asset:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --image-urn "urn:li:image:123456" \
   --alt-text "Bitdevs BSB event banner" \
   "Hello from the new Posts API"
 ```
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --video-urn "urn:li:video:123456" \
   --video-title "Linus on abstraction" \
   "Hello from the new Posts API"
 ```
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --document-urn "urn:li:document:123456" \
   --document-title "June deck" \
   "Hello from the new Posts API"
@@ -188,7 +187,7 @@ uv run licli post \
 You can also pass values as flags:
 
 ```bash
-uv run licli post \
+uv run lkdn post \
   --access-token "..." \
   --author "urn:li:person:YOUR_ID" \
   --api-version "YYYYMM" \
@@ -198,84 +197,84 @@ uv run licli post \
 List posts for the configured author:
 
 ```bash
-uv run licli post list
+uv run lkdn post list
 ```
 
 List posts for an organization author explicitly:
 
 ```bash
-uv run licli post list \
+uv run lkdn post list \
   --author "urn:li:organization:123456"
 ```
 
 Read a post by URN:
 
 ```bash
-uv run licli post get "urn:li:share:123456789"
+uv run lkdn post get "urn:li:share:123456789"
 ```
 
 Read multiple posts by URN:
 
 ```bash
-uv run licli post batch-get "urn:li:share:123456789" "urn:li:share:987654321"
+uv run lkdn post batch-get "urn:li:share:123456789" "urn:li:share:987654321"
 ```
 
 Inspect an image or video asset by URN:
 
 ```bash
-uv run licli image get "urn:li:image:123456"
-uv run licli document get "urn:li:document:123456"
-uv run licli video get "urn:li:video:123456"
+uv run lkdn image get "urn:li:image:123456"
+uv run lkdn document get "urn:li:document:123456"
+uv run lkdn video get "urn:li:video:123456"
 ```
 
 Batch-read multiple assets by URN:
 
 ```bash
-uv run licli image list --id "urn:li:image:123456" --id "urn:li:image:789012"
-uv run licli document list --id "urn:li:document:123456" --id "urn:li:document:789012"
-uv run licli video list --id "urn:li:video:123456" --id "urn:li:video:789012"
+uv run lkdn image list --id "urn:li:image:123456" --id "urn:li:image:789012"
+uv run lkdn document list --id "urn:li:document:123456" --id "urn:li:document:789012"
+uv run lkdn video list --id "urn:li:video:123456" --id "urn:li:video:789012"
 ```
 
 Discover which organizations the authenticated member can act for:
 
 ```bash
-uv run licli organization list
+uv run lkdn organization list
 export LINKEDIN_MEMBER_URN="urn:li:person:YOUR_ID"
-uv run licli organization members "urn:li:organization:123456"
-uv run licli organization preflight "urn:li:organization:123456"
+uv run lkdn organization members "urn:li:organization:123456"
+uv run lkdn organization preflight "urn:li:organization:123456"
 ```
 
 Inspect comments, reactions, and social metadata:
 
 ```bash
-uv run licli comment get "urn:li:share:123456789" "456"
-uv run licli comment list "urn:li:share:123456789"
-uv run licli comment batch-get "urn:li:share:123456789" "456" "789"
-uv run licli comment create "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" "Hello world"
-uv run licli comment edit "urn:li:share:123456789" "456" --text "Updated comment"
-uv run licli comment delete "urn:li:share:123456789" "456"
-uv run licli reaction get --actor "urn:li:person:YOUR_ID" --entity "urn:li:share:123456789"
-uv run licli reaction create --actor "urn:li:person:YOUR_ID" --root "urn:li:share:123456789" --type LIKE
-uv run licli reaction list "urn:li:share:123456789"
-uv run licli reaction batch-get --key "urn:li:person:YOUR_ID" "urn:li:share:123456789"
-uv run licli reaction delete --actor "urn:li:person:YOUR_ID" --entity "urn:li:share:123456789"
-uv run licli social-metadata get "urn:li:share:123456789"
-uv run licli social-metadata batch-get "urn:li:share:123456789" "urn:li:comment:(urn:li:share:123456789,456)"
-uv run licli social-metadata set-comments-state "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" --state CLOSED
+uv run lkdn comment get "urn:li:share:123456789" "456"
+uv run lkdn comment list "urn:li:share:123456789"
+uv run lkdn comment batch-get "urn:li:share:123456789" "456" "789"
+uv run lkdn comment create "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" "Hello world"
+uv run lkdn comment edit "urn:li:share:123456789" "456" --text "Updated comment"
+uv run lkdn comment delete "urn:li:share:123456789" "456"
+uv run lkdn reaction get --actor "urn:li:person:YOUR_ID" --entity "urn:li:share:123456789"
+uv run lkdn reaction create --actor "urn:li:person:YOUR_ID" --root "urn:li:share:123456789" --type LIKE
+uv run lkdn reaction list "urn:li:share:123456789"
+uv run lkdn reaction batch-get --key "urn:li:person:YOUR_ID" "urn:li:share:123456789"
+uv run lkdn reaction delete --actor "urn:li:person:YOUR_ID" --entity "urn:li:share:123456789"
+uv run lkdn social-metadata get "urn:li:share:123456789"
+uv run lkdn social-metadata batch-get "urn:li:share:123456789" "urn:li:comment:(urn:li:share:123456789,456)"
+uv run lkdn social-metadata set-comments-state "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" --state CLOSED
 ```
 
 Inspect the authenticated member identity:
 
 ```bash
-uv run licli profile whoami
-uv run licli profile whoami --source profile-api
-uv run licli profile whoami --source identity-me --identity-api-version 202510.03
+uv run lkdn profile whoami
+uv run lkdn profile whoami --source profile-api
+uv run lkdn profile whoami --source identity-me --identity-api-version 202510.03
 ```
 
 Edit a post's text or content CTA:
 
 ```bash
-uv run licli post edit "urn:li:share:123456789" \
+uv run lkdn post edit "urn:li:share:123456789" \
   --text "Edited text" \
   --cta-label LEARN_MORE \
   --landing-page "https://example.com"
@@ -284,38 +283,38 @@ uv run licli post edit "urn:li:share:123456789" \
 Update a post lifecycle state through the official partial-update surface:
 
 ```bash
-uv run licli post edit "urn:li:share:123456789" \
+uv run lkdn post edit "urn:li:share:123456789" \
   --lifecycle-state PUBLISHED
 ```
 
 Delete a post by URN:
 
 ```bash
-uv run licli post delete "urn:li:share:123456789"
+uv run lkdn post delete "urn:li:share:123456789"
 ```
 
 If your post text starts with a reserved action word such as `get`, `list`, or `delete`, use the explicit alias:
 
 ```bash
-uv run licli post create "get ready for BitDevs tonight"
+uv run lkdn post create "get ready for BitDevs tonight"
 ```
 
 Read employment data through official profile APIs:
 
 ```bash
-uv run licli profile employment-history
+uv run lkdn profile employment-history
 ```
 
 Use the Verified on LinkedIn `identityMe` endpoint instead:
 
 ```bash
-uv run licli profile employment-history --source identity-me
+uv run lkdn profile employment-history --source identity-me
 ```
 
 Limit output to a different lookback window:
 
 ```bash
-uv run licli profile employment-history --years 3
+uv run lkdn profile employment-history --years 3
 ```
 
 ## Docs

@@ -33,9 +33,8 @@ After the trusted publisher exists, publishing is:
 ## Intended install UX
 
 ```bash
-uvx --from lkdn licli --help
+uvx --from lkdn lkdn --help
 uv tool install lkdn
-licli --help
 lkdn --help
 linkedin --help
 ```
