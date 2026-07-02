@@ -3349,6 +3349,170 @@ def test_cli_profile_voyager_session_exports_env(
     assert "LINKEDIN_PROFILE_PUBLIC_ID=brenorb" in stdout
 
 
+def test_cli_profile_voyager_session_outputs_json(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Session:
+        browser = "chrome"
+        li_at = "browser-li-at"
+        jsessionid = '"ajax:browser"'
+        csrf_token = "ajax:browser"
+
+    monkeypatch.setattr("linkedin_cli.cli.load_voyager_session_from_browser", lambda **_: Session())
+
+    exit_code = main(
+        [
+            "profile",
+            "voyager-session",
+            "--public-id",
+            "brenorb",
+            "--format",
+            "json",
+        ],
+        env={},
+        client_factory=_unused_client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert '"browser": "chrome"' in stdout
+    assert '"li_at": "browser-li-at"' in stdout
+    assert '"csrf_token": "ajax:browser"' in stdout
+    assert '"public_id": "brenorb"' in stdout
+
+
+def test_cli_post_rejects_document_title_without_document(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main(
+        ["post", "--document-title", "June deck", "Ship", "it"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "document title requires a document" in stderr.lower()
+
+
+def test_cli_post_rejects_article_fields_without_article_url(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    thumbnail_path = tmp_path / "thumb.png"
+    thumbnail_path.write_bytes(b"fakepng")
+
+    exit_code = main(
+        [
+            "post",
+            "--article-title",
+            "Deep systems",
+            "--article-description",
+            "A long read",
+            "--article-thumbnail",
+            str(thumbnail_path),
+            "Ship",
+            "it",
+        ],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "article fields require an article url" in stderr.lower()
+
+
+def test_cli_post_rejects_video_metadata_without_video(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captions_path = tmp_path / "clip.vtt"
+    thumbnail_path = tmp_path / "thumb.png"
+    captions_path.write_text("WEBVTT", encoding="utf-8")
+    thumbnail_path.write_bytes(b"fakepng")
+
+    exit_code = main(
+        [
+            "post",
+            "--video-title",
+            "Linus on abstraction",
+            "--video-captions",
+            str(captions_path),
+            "--video-thumbnail",
+            str(thumbnail_path),
+            "Ship",
+            "it",
+        ],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "video metadata requires a video" in stderr.lower()
+
+
+def test_cli_post_rejects_upload_only_video_extras_with_video_urn(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captions_path = tmp_path / "clip.vtt"
+    thumbnail_path = tmp_path / "thumb.png"
+    captions_path.write_text("WEBVTT", encoding="utf-8")
+    thumbnail_path.write_bytes(b"fakepng")
+
+    exit_code = main(
+        [
+            "post",
+            "--video-urn",
+            "urn:li:video:123",
+            "--video-captions",
+            str(captions_path),
+            "--video-thumbnail",
+            str(thumbnail_path),
+            "Ship",
+            "it",
+        ],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "video captions and thumbnail require a local video upload" in stderr.lower()
+
+
+def test_cli_post_rejects_poll_duration_without_poll_question(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main(
+        ["post", "--poll-duration", "THREE_DAYS", "Ship", "it"],
+        env={
+            "LINKEDIN_ACCESS_TOKEN": "env-token",
+            "LINKEDIN_AUTHOR_URN": "urn:li:person:env123",
+        },
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "poll duration requires a poll question" in stderr.lower()
+
+
 def test_cli_profile_employment_history_requires_access_token(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

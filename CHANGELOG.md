@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4 - 2026-07-02
+
+- Reject orphaned `post create` flags that previously could fall through into a plain text post, including document titles without documents, article-only fields without `--article-url`, video-only metadata without a video source, upload-only video extras without a local upload, and poll duration without a poll question.
+- Added regression coverage for those CLI validation cases plus the `profile voyager-session --format json` output path.
+
 ## 0.1.3 - 2026-07-01
 
 - Refreshed `uv.lock` without local `exclude-newer` options so GitHub Actions can run `uv sync --locked --no-config` during release builds.

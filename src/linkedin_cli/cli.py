@@ -801,6 +801,14 @@ def _run_post(
         print("Missing required configuration: choose either an image path or an image URN, not both.", file=sys.stderr)
         return 2
 
+    if post_command == "create" and args.document_title and not (args.document or args.document_urn):
+        print("Missing required configuration: document title requires a document.", file=sys.stderr)
+        return 2
+
+    if post_command == "create" and _post_create_has_article_fields(args) and not args.article_url:
+        print("Missing required configuration: article fields require an article URL.", file=sys.stderr)
+        return 2
+
     if post_command == "create" and args.article_thumbnail and args.article_thumbnail_urn:
         print(
             "Missing required configuration: choose either an article thumbnail path or URN, not both.",
@@ -821,6 +829,17 @@ def _run_post(
 
     if post_command == "create" and args.video and args.video_urn:
         print("Missing required configuration: choose either a video path or a video URN, not both.", file=sys.stderr)
+        return 2
+
+    if post_command == "create" and _post_create_has_video_metadata(args) and not (args.video or args.video_urn):
+        print("Missing required configuration: video metadata requires a video.", file=sys.stderr)
+        return 2
+
+    if post_command == "create" and (args.video_captions or args.video_thumbnail) and not args.video:
+        print(
+            "Missing required configuration: video captions and thumbnail require a local video upload.",
+            file=sys.stderr,
+        )
         return 2
 
     if post_command == "create" and (args.document or args.document_urn) and not args.document_title:
@@ -858,6 +877,9 @@ def _run_post(
         if len(args.poll_option or []) < 2:
             print("Missing required configuration: poll posts require at least two poll options.", file=sys.stderr)
             return 2
+    elif post_command == "create" and args.poll_duration:
+        print("Missing required configuration: poll duration requires a poll question.", file=sys.stderr)
+        return 2
     elif post_command == "create" and args.poll_option:
         print("Missing required configuration: poll options require a poll question.", file=sys.stderr)
         return 2
@@ -1090,6 +1112,23 @@ def _post_create_has_attached_media(args: argparse.Namespace) -> bool:
         or args.video
         or args.video_urn
         or args.article_url
+    )
+
+
+def _post_create_has_article_fields(args: argparse.Namespace) -> bool:
+    return bool(
+        args.article_title
+        or args.article_description
+        or args.article_thumbnail
+        or args.article_thumbnail_urn
+    )
+
+
+def _post_create_has_video_metadata(args: argparse.Namespace) -> bool:
+    return bool(
+        args.video_title
+        or args.video_captions
+        or args.video_thumbnail
     )
 
 
