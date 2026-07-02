@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from typing import Any
 
 from linkedin_cli.employment import normalize_browser_experience_entries
 
