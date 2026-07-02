@@ -2909,6 +2909,446 @@ def test_cli_profile_employment_history_can_use_identity_me(
     assert '"Senior Software Engineer"' in stdout
 
 
+def test_cli_profile_employment_history_can_use_voyager_private(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_voyager_employment_history(self, public_identifier: str) -> list[dict[str, object]]:
+            captured["called"] = "voyager-private"
+            captured["public_identifier"] = public_identifier
+            return [
+                {
+                    "employer_name": "Factored",
+                    "job_title": "Machine Learning Engineer",
+                    "start_date": "2025-04",
+                    "end_date": "2025-12",
+                    "is_current": False,
+                }
+            ]
+
+    def client_factory(
+        *,
+        access_token: str,
+        api_version: str,
+        voyager_li_at: str | None = None,
+        voyager_jsessionid: str | None = None,
+        voyager_csrf_token: str | None = None,
+    ) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        captured["voyager_li_at"] = voyager_li_at
+        captured["voyager_jsessionid"] = voyager_jsessionid
+        captured["voyager_csrf_token"] = voyager_csrf_token
+        return StubClient()
+
+    exit_code = main(
+        [
+            "profile",
+            "employment-history",
+            "--source",
+            "voyager-private",
+        ],
+        env={
+            "LINKEDIN_API_VERSION": "202606",
+            "LINKEDIN_VOYAGER_LI_AT": "test-li-at",
+            "LINKEDIN_VOYAGER_JSESSIONID": '"ajax:123"',
+            "LINKEDIN_PROFILE_PUBLIC_ID": "brenorb",
+        },
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "",
+        "api_version": "202606",
+        "voyager_li_at": "test-li-at",
+        "voyager_jsessionid": '"ajax:123"',
+        "voyager_csrf_token": None,
+        "called": "voyager-private",
+        "public_identifier": "brenorb",
+    }
+    assert '"Factored"' in stdout
+    assert '"Machine Learning Engineer"' in stdout
+
+
+def test_cli_profile_employment_history_can_load_voyager_session_from_browser(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_voyager_employment_history(self, public_identifier: str) -> list[dict[str, object]]:
+            captured["called"] = "voyager-private"
+            captured["public_identifier"] = public_identifier
+            return [
+                {
+                    "employer_name": "Factored",
+                    "job_title": "Machine Learning Engineer",
+                    "start_date": "2025-04",
+                    "end_date": "2025-12",
+                    "is_current": False,
+                }
+            ]
+
+    class Session:
+        li_at = "browser-li-at"
+        jsessionid = '"ajax:browser"'
+        csrf_token = "ajax:browser"
+
+    monkeypatch.setattr("linkedin_cli.cli.load_voyager_session_from_browser", lambda **_: Session())
+
+    def client_factory(
+        *,
+        access_token: str,
+        api_version: str,
+        voyager_li_at: str | None = None,
+        voyager_jsessionid: str | None = None,
+        voyager_csrf_token: str | None = None,
+    ) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        captured["voyager_li_at"] = voyager_li_at
+        captured["voyager_jsessionid"] = voyager_jsessionid
+        captured["voyager_csrf_token"] = voyager_csrf_token
+        return StubClient()
+
+    exit_code = main(
+        [
+            "profile",
+            "employment-history",
+            "--source",
+            "voyager-private",
+            "--browser",
+            "chrome",
+            "--public-id",
+            "brenorb",
+        ],
+        env={},
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "",
+        "api_version": "202606",
+        "voyager_li_at": "browser-li-at",
+        "voyager_jsessionid": '"ajax:browser"',
+        "voyager_csrf_token": "ajax:browser",
+        "called": "voyager-private",
+        "public_identifier": "brenorb",
+    }
+    assert '"Factored"' in stdout
+
+
+def test_cli_profile_employment_history_falls_back_to_voyager_on_api_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_employment_history(self) -> list[dict[str, object]]:
+            captured["official_called"] = True
+            raise LinkedInApiError(403, "Access denied")
+
+        def get_voyager_employment_history(self, public_identifier: str) -> list[dict[str, object]]:
+            captured["voyager_called"] = public_identifier
+            return [
+                {
+                    "employer_name": "Factored",
+                    "job_title": "Machine Learning Engineer",
+                    "start_date": "2025-04",
+                    "end_date": "2025-12",
+                    "is_current": False,
+                }
+            ]
+
+    def client_factory(
+        *,
+        access_token: str,
+        api_version: str,
+        voyager_li_at: str | None = None,
+        voyager_jsessionid: str | None = None,
+        voyager_csrf_token: str | None = None,
+    ) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        captured["voyager_li_at"] = voyager_li_at
+        captured["voyager_jsessionid"] = voyager_jsessionid
+        captured["voyager_csrf_token"] = voyager_csrf_token
+        return StubClient()
+
+    exit_code = main(
+        [
+            "profile",
+            "employment-history",
+            "--public-id",
+            "brenorb",
+            "--li-at",
+            "test-li-at",
+            "--jsessionid",
+            '"ajax:123"',
+        ],
+        env={"LINKEDIN_ACCESS_TOKEN": "env-token"},
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202606",
+        "voyager_li_at": "test-li-at",
+        "voyager_jsessionid": '"ajax:123"',
+        "voyager_csrf_token": None,
+        "official_called": True,
+        "voyager_called": "brenorb",
+    }
+    assert '"Factored"' in stdout
+
+
+def test_cli_profile_employment_history_can_use_voyager_without_access_token(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_voyager_employment_history(self, public_identifier: str) -> list[dict[str, object]]:
+            captured["voyager_called"] = public_identifier
+            return [
+                {
+                    "employer_name": "Factored",
+                    "job_title": "Machine Learning Engineer",
+                    "start_date": "2025-04",
+                    "end_date": "2025-12",
+                    "is_current": False,
+                }
+            ]
+
+    def client_factory(
+        *,
+        access_token: str,
+        api_version: str,
+        voyager_li_at: str | None = None,
+        voyager_jsessionid: str | None = None,
+        voyager_csrf_token: str | None = None,
+    ) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        captured["voyager_li_at"] = voyager_li_at
+        captured["voyager_jsessionid"] = voyager_jsessionid
+        captured["voyager_csrf_token"] = voyager_csrf_token
+        return StubClient()
+
+    exit_code = main(
+        [
+            "profile",
+            "employment-history",
+            "--public-id",
+            "brenorb",
+            "--li-at",
+            "test-li-at",
+            "--jsessionid",
+            '"ajax:123"',
+        ],
+        env={},
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "",
+        "api_version": "202606",
+        "voyager_li_at": "test-li-at",
+        "voyager_jsessionid": '"ajax:123"',
+        "voyager_csrf_token": None,
+        "voyager_called": "brenorb",
+    }
+    assert '"Factored"' in stdout
+
+
+def test_cli_profile_employment_history_falls_back_to_chrome_profile_when_voyager_is_gone(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_voyager_employment_history(self, public_identifier: str) -> list[dict[str, object]]:
+            captured["voyager_called"] = public_identifier
+            raise LinkedInApiError(410, '{"status":410}')
+
+    class Session:
+        li_at = "browser-li-at"
+        jsessionid = '"ajax:browser"'
+        csrf_token = "ajax:browser"
+
+    monkeypatch.setattr("linkedin_cli.cli.load_voyager_session_from_browser", lambda **_: Session())
+    monkeypatch.setattr(
+        "linkedin_cli.cli.load_employment_history_from_chrome_profile",
+        lambda public_identifier: [
+            {
+                "employer_name": "Factored",
+                "job_title": "Machine Learning Engineer",
+                "start_date": "2025-04",
+                "end_date": None,
+                "is_current": True,
+            }
+        ],
+    )
+
+    def client_factory(
+        *,
+        access_token: str,
+        api_version: str,
+        voyager_li_at: str | None = None,
+        voyager_jsessionid: str | None = None,
+        voyager_csrf_token: str | None = None,
+    ) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        captured["voyager_li_at"] = voyager_li_at
+        captured["voyager_jsessionid"] = voyager_jsessionid
+        captured["voyager_csrf_token"] = voyager_csrf_token
+        return StubClient()
+
+    exit_code = main(
+        [
+            "profile",
+            "employment-history",
+            "--public-id",
+            "brenorb",
+            "--browser",
+            "chrome",
+        ],
+        env={},
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "",
+        "api_version": "202606",
+        "voyager_li_at": "browser-li-at",
+        "voyager_jsessionid": '"ajax:browser"',
+        "voyager_csrf_token": "ajax:browser",
+        "voyager_called": "brenorb",
+    }
+    assert '"Factored"' in stdout
+    assert '"Machine Learning Engineer"' in stdout
+
+
+def test_cli_profile_employment_history_falls_back_to_chrome_profile_after_official_and_voyager_errors(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubClient:
+        def get_employment_history(self) -> list[dict[str, object]]:
+            captured["official_called"] = True
+            raise LinkedInApiError(403, "Access denied")
+
+        def get_voyager_employment_history(self, public_identifier: str) -> list[dict[str, object]]:
+            captured["voyager_called"] = public_identifier
+            raise LinkedInApiError(410, '{"status":410}')
+
+    monkeypatch.setattr(
+        "linkedin_cli.cli.load_employment_history_from_chrome_profile",
+        lambda public_identifier: [
+            {
+                "employer_name": "Factored",
+                "job_title": "Machine Learning Engineer",
+                "start_date": "2025-04",
+                "end_date": None,
+                "is_current": True,
+            }
+        ],
+    )
+
+    def client_factory(
+        *,
+        access_token: str,
+        api_version: str,
+        voyager_li_at: str | None = None,
+        voyager_jsessionid: str | None = None,
+        voyager_csrf_token: str | None = None,
+    ) -> StubClient:
+        captured["access_token"] = access_token
+        captured["api_version"] = api_version
+        captured["voyager_li_at"] = voyager_li_at
+        captured["voyager_jsessionid"] = voyager_jsessionid
+        captured["voyager_csrf_token"] = voyager_csrf_token
+        return StubClient()
+
+    exit_code = main(
+        [
+            "profile",
+            "employment-history",
+            "--public-id",
+            "brenorb",
+            "--li-at",
+            "test-li-at",
+            "--jsessionid",
+            '"ajax:123"',
+            "--browser",
+            "chrome",
+        ],
+        env={"LINKEDIN_ACCESS_TOKEN": "env-token"},
+        client_factory=client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert captured == {
+        "access_token": "env-token",
+        "api_version": "202606",
+        "voyager_li_at": "test-li-at",
+        "voyager_jsessionid": '"ajax:123"',
+        "voyager_csrf_token": None,
+        "official_called": True,
+        "voyager_called": "brenorb",
+    }
+    assert '"Factored"' in stdout
+
+
+def test_cli_profile_voyager_session_exports_env(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Session:
+        browser = "chrome"
+        li_at = "browser-li-at"
+        jsessionid = '"ajax:browser"'
+        csrf_token = "ajax:browser"
+
+    monkeypatch.setattr("linkedin_cli.cli.load_voyager_session_from_browser", lambda **_: Session())
+
+    exit_code = main(
+        [
+            "profile",
+            "voyager-session",
+            "--public-id",
+            "brenorb",
+        ],
+        env={},
+        client_factory=_unused_client_factory,
+    )
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert "LINKEDIN_VOYAGER_LI_AT" in stdout
+    assert "LINKEDIN_VOYAGER_JSESSIONID" in stdout
+    assert "LINKEDIN_VOYAGER_CSRF_TOKEN" in stdout
+    assert "LINKEDIN_PROFILE_PUBLIC_ID=brenorb" in stdout
+
+
 def test_cli_profile_employment_history_requires_access_token(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -2921,6 +3361,27 @@ def test_cli_profile_employment_history_requires_access_token(
     stderr = capsys.readouterr().err
     assert exit_code == 2
     assert "access token" in stderr.lower()
+
+
+def test_cli_profile_employment_history_voyager_private_requires_session_configuration(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main(
+        [
+            "profile",
+            "employment-history",
+            "--source",
+            "voyager-private",
+        ],
+        env={},
+        client_factory=_unused_client_factory,
+    )
+
+    stderr = capsys.readouterr().err
+    assert exit_code == 2
+    assert "voyager li_at session cookie" in stderr.lower()
+    assert "voyager csrf token or jsessionid" in stderr.lower()
+    assert "public profile identifier" in stderr.lower()
 
 
 def test_cli_profile_employment_history_returns_1_on_api_error(

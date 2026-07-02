@@ -2408,6 +2408,59 @@ def test_get_current_employment_uses_identity_me() -> None:
     ]
 
 
+def test_get_voyager_employment_history_uses_private_profile_endpoint() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == httpx.URL("https://www.linkedin.com/voyager/api/identity/profiles/brenorb/profileView")
+        assert request.headers["accept"] == "application/vnd.linkedin.normalized+json+2.1, application/json"
+        assert request.headers["csrf-token"] == "ajax:123"
+        assert 'li_at=test-li-at' in request.headers["cookie"]
+        assert 'JSESSIONID="ajax:123"' in request.headers["cookie"]
+        return httpx.Response(
+            200,
+            json={
+                "positionView": {
+                    "elements": [
+                        {
+                            "companyName": "Factored",
+                            "title": "Machine Learning Engineer",
+                            "timePeriod": {
+                                "startDate": {
+                                    "month": 4,
+                                    "year": 2025,
+                                },
+                                "endDate": {
+                                    "month": 12,
+                                    "year": 2025,
+                                },
+                            },
+                        }
+                    ]
+                }
+            },
+        )
+
+    client = LinkedInClient(
+        access_token="unused-token",
+        api_version="202606",
+        voyager_li_at="test-li-at",
+        voyager_jsessionid='"ajax:123"',
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.get_voyager_employment_history("brenorb")
+
+    assert result == [
+        {
+            "employer_name": "Factored",
+            "job_title": "Machine Learning Engineer",
+            "start_date": "2025-04",
+            "end_date": "2025-12",
+            "is_current": False,
+        }
+    ]
+
+
 def test_get_identity_profile_uses_configured_identity_api_version() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "GET"

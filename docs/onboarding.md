@@ -20,6 +20,9 @@ Employment-data support is separate and more constrained:
 - `profile employment-history --source identity-me` uses the Verified on LinkedIn `GET /rest/identityMe` endpoint.
 - Current position on `identityMe` requires Plus tier and the `r_primary_current_experience` scope.
 - Multi-position history through the older Profile API depends on restricted access to `positions` under `r_fullprofile`, which LinkedIn documents as closed.
+- `profile employment-history --source voyager-private` uses the logged-in LinkedIn web session against `https://www.linkedin.com/voyager/api/identity/profiles/{publicId}/profileView` and expects `li_at` plus `JSESSIONID` or a matching CSRF token.
+- `profile employment-history --source voyager-private --browser chrome` can pull those cookies from a local Chromium-family browser profile when you do not want to export them manually.
+- `profile employment-history --public-id <id> --browser chrome` now falls back through official API, Voyager, and finally the live Chrome profile page. On macOS, that last step needs `View > Developer > Allow JavaScript from Apple Events` enabled in Chrome.
 
 Post-management support also splits along member versus organization and read versus write permissions:
 

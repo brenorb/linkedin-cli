@@ -9,7 +9,11 @@ from urllib.parse import quote
 
 import httpx
 
-from linkedin_cli.employment import normalize_current_position, normalize_positions_payload
+from linkedin_cli.employment import (
+    normalize_current_position,
+    normalize_positions_payload,
+    normalize_voyager_profile_payload,
+)
 
 DEFAULT_API_VERSION = "202606"
 DEFAULT_IDENTITY_API_VERSION = "202510.03"
@@ -45,6 +49,10 @@ class LinkedInClient:
         media_upload_timeout: float = 300.0,
         video_wait_timeout: float = 300.0,
         video_wait_interval: float = 2.0,
+        voyager_li_at: str | None = None,
+        voyager_csrf_token: str | None = None,
+        voyager_jsessionid: str | None = None,
+        voyager_base_url: str = "https://www.linkedin.com",
     ) -> None:
         self._identity_api_version = identity_api_version
         self._client = httpx.Client(
@@ -63,6 +71,26 @@ class LinkedInClient:
             timeout=timeout,
             follow_redirects=True,
         )
+        voyager_headers = {
+            "Accept": "application/vnd.linkedin.normalized+json+2.1, application/json",
+            "csrf-token": _voyager_csrf_token(voyager_csrf_token, voyager_jsessionid),
+        }
+        voyager_cookies: dict[str, str] = {}
+        if voyager_li_at is not None:
+            voyager_cookies["li_at"] = voyager_li_at
+        if voyager_jsessionid is not None:
+            voyager_cookies["JSESSIONID"] = voyager_jsessionid
+        self._voyager_client = (
+            httpx.Client(
+                base_url=voyager_base_url,
+                transport=transport,
+                timeout=timeout,
+                headers={key: value for key, value in voyager_headers.items() if value is not None},
+                cookies=voyager_cookies,
+            )
+            if voyager_cookies
+            else None
+        )
         self._media_upload_timeout = media_upload_timeout
         self._video_wait_timeout = video_wait_timeout
         self._video_wait_interval = video_wait_interval
@@ -70,6 +98,8 @@ class LinkedInClient:
     def close(self) -> None:
         self._client.close()
         self._upload_client.close()
+        if self._voyager_client is not None:
+            self._voyager_client.close()
 
     def create_text_post(
         self,
@@ -693,10 +723,23 @@ class LinkedInClient:
             raise LinkedInApiError(response.status_code, _extract_error_message(response))
         return normalize_current_position(_response_json(response))
 
+    def get_voyager_employment_history(self, public_identifier: str) -> list[dict[str, object]]:
+        response = self._required_voyager_client().get(
+            f"/voyager/api/identity/profiles/{quote(public_identifier, safe='')}/profileView"
+        )
+        if response.is_error:
+            raise LinkedInApiError(response.status_code, _extract_error_message(response))
+        return normalize_voyager_profile_payload(_response_json(response))
+
     def _required_identity_api_version(self) -> str:
         if self._identity_api_version is None:
             raise ValueError("identity API version is required for `/rest/identityMe` requests")
         return self._identity_api_version
+
+    def _required_voyager_client(self) -> httpx.Client:
+        if self._voyager_client is None:
+            raise ValueError("Voyager session cookies are required for `/voyager/api` requests")
+        return self._voyager_client
 
     def create_image_post(
         self,
@@ -1311,6 +1354,14 @@ def _extract_error_message(response: httpx.Response) -> str:
                 return value
 
     return response.text or "Unknown error"
+
+
+def _voyager_csrf_token(csrf_token: str | None, jsessionid: str | None) -> str | None:
+    if csrf_token is not None:
+        return csrf_token.strip('"')
+    if jsessionid is not None:
+        return jsessionid.strip('"')
+    return None
 
 
 def _normalize_etag(value: str) -> str:

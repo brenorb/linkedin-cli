@@ -2,6 +2,7 @@ from datetime import date
 
 from linkedin_cli.employment import (
     filter_employment_history,
+    normalize_browser_experience_entries,
     normalize_current_position,
     normalize_positions_payload,
 )
@@ -168,4 +169,45 @@ def test_normalize_current_position_maps_identity_me_response() -> None:
             "end_date": None,
             "is_current": True,
         }
+    ]
+
+
+def test_normalize_browser_experience_entries_maps_profile_section_rows() -> None:
+    entries = [
+        {
+            "lines": [
+                "Experience",
+                "Machine Learning Engineer",
+                "Factored AI · Full-time",
+                "Apr 2025 - Present · 1 yr 3 mos",
+                "Remote",
+            ],
+            "description": "- Built the agent system\n- Presented the work publicly",
+        },
+        [
+            "Software Engineer",
+            "Older Co",
+            "Jan 2021 - Dec 2024 · 4 yrs",
+            "Sao Paulo, Brazil",
+        ],
+        ["Noise only"],
+    ]
+
+    assert normalize_browser_experience_entries(entries) == [
+        {
+            "employer_name": "Factored AI",
+            "job_title": "Machine Learning Engineer",
+            "start_date": "2025-04",
+            "end_date": None,
+            "is_current": True,
+            "description": "- Built the agent system\n- Presented the work publicly",
+        },
+        {
+            "employer_name": "Older Co",
+            "job_title": "Software Engineer",
+            "start_date": "2021-01",
+            "end_date": "2024-12",
+            "is_current": False,
+            "description": None,
+        },
     ]

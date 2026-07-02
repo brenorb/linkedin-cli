@@ -1,6 +1,6 @@
 [project]
 name = "lkdn"
-version = "0.1.1"
+version = "0.1.2"
 description = "Minimal CLI for publishing LinkedIn text posts with the Posts API"
 readme = "README.md"
 authors = [
@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "browser-cookie3>=0.20.1",
     "httpx>=0.28.1",
 ]
 

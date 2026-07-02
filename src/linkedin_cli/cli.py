@@ -4,12 +4,15 @@ import argparse
 import inspect
 import json
 import os
+import shlex
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from datetime import date
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from linkedin_cli.browser_profile import load_employment_history_from_chrome_profile
+from linkedin_cli.browser_session import SUPPORTED_BROWSERS, load_voyager_session_from_browser
 from linkedin_cli.client import (
     DEFAULT_API_VERSION,
     DEFAULT_IDENTITY_API_VERSION,
@@ -164,6 +167,7 @@ class LinkedInPostClient(Protocol):
     def get_identity_profile(self) -> dict[str, Any]: ...
     def get_employment_history(self) -> list[dict[str, object]]: ...
     def get_current_employment(self) -> list[dict[str, object]]: ...
+    def get_voyager_employment_history(self, public_identifier: str) -> list[dict[str, object]]: ...
     def list_organization_access(
         self,
         *,
@@ -254,6 +258,7 @@ POST_LIST_MAX_COUNT = 100
 REACTION_SORT_OPTIONS = ("CHRONOLOGICAL", "REVERSE_CHRONOLOGICAL", "RELEVANCE")
 COMMENTS_STATE_OPTIONS = ("OPEN", "CLOSED")
 ORGANIZATION_ACCESS_STATES = ("APPROVED", "REQUESTED", "REVOKED", "REJECTED")
+BROWSER_CHOICES = SUPPORTED_BROWSERS
 
 
 def build_parser(
@@ -640,9 +645,9 @@ def build_parser(
     )
     employment_parser.add_argument(
         "--source",
-        choices=("profile-api", "identity-me"),
+        choices=("profile-api", "identity-me", "voyager-private"),
         default="profile-api",
-        help="Official LinkedIn API source.",
+        help="LinkedIn profile source.",
     )
     employment_parser.add_argument(
         "--years",
@@ -650,9 +655,68 @@ def build_parser(
         default=5,
         help="Return only employment records overlapping the last N years.",
     )
+    employment_parser.add_argument(
+        "--public-id",
+        default=None,
+        help="LinkedIn public profile identifier, for example `brenorb`. Required for `--source voyager-private`.",
+    )
+    employment_parser.add_argument(
+        "--li-at",
+        default=None,
+        help="LinkedIn `li_at` session cookie for `--source voyager-private`.",
+    )
+    employment_parser.add_argument(
+        "--jsessionid",
+        default=None,
+        help="LinkedIn `JSESSIONID` session cookie for `--source voyager-private`.",
+    )
+    employment_parser.add_argument(
+        "--csrf-token",
+        default=None,
+        help="Voyager CSRF token. If omitted, the value is derived from `--jsessionid`.",
+    )
+    employment_parser.add_argument(
+        "--browser",
+        choices=BROWSER_CHOICES,
+        default=None,
+        help="Load `li_at` and `JSESSIONID` from a local browser profile for `--source voyager-private`.",
+    )
+    employment_parser.add_argument(
+        "--cookie-file",
+        type=Path,
+        default=None,
+        help="Override the browser cookie database path used with `--browser`.",
+    )
     _add_access_token_argument(employment_parser)
     _add_api_version_argument(employment_parser)
     _add_identity_api_version_argument(employment_parser)
+    voyager_session_parser = profile_subparsers.add_parser(
+        "voyager-session",
+        help="Read LinkedIn Voyager web-session cookies from a local browser profile",
+    )
+    voyager_session_parser.add_argument(
+        "--browser",
+        choices=BROWSER_CHOICES,
+        default="chrome",
+        help="Browser profile to read. Defaults to Chrome.",
+    )
+    voyager_session_parser.add_argument(
+        "--cookie-file",
+        type=Path,
+        default=None,
+        help="Override the browser cookie database path.",
+    )
+    voyager_session_parser.add_argument(
+        "--public-id",
+        default=None,
+        help="Optional LinkedIn public profile identifier to include in the exported output.",
+    )
+    voyager_session_parser.add_argument(
+        "--format",
+        choices=("env", "json"),
+        default="env",
+        help="Output format. `env` prints export statements; `json` prints structured fields.",
+    )
     return parser
 
 
@@ -690,6 +754,8 @@ def main(
         return _run_profile_whoami(args, environment, client_factory or _default_client_factory)
     if args.command == "profile" and args.profile_command == "employment-history":
         return _run_employment_history(args, environment, client_factory or _default_client_factory)
+    if args.command == "profile" and args.profile_command == "voyager-session":
+        return _run_profile_voyager_session(args, environment)
 
     parser.error(f"unknown command: {args.command}")
     return 2
@@ -876,13 +942,33 @@ def _run_employment_history(
     client = _configured_client(args, env, client_factory)
     if client is None:
         return 2
+    public_identifier = _configured_public_identifier(args, env)
+    voyager_fallback_available = _has_voyager_fallback(args, env, require_public_id=True)
+    browser_profile_fallback_available = _has_browser_profile_fallback(args, env, require_public_id=True)
+    access_token_available = _configured_value(getattr(args, "access_token", None), env.get("LINKEDIN_ACCESS_TOKEN")) is not None
     try:
         if args.source == "identity-me":
             records = client.get_current_employment()
+        elif args.source == "voyager-private":
+            if public_identifier is None:
+                print("Missing required configuration: public profile identifier.", file=sys.stderr)
+                return 2
+            records = _voyager_employment_with_browser_fallback(
+                client=client,
+                public_identifier=public_identifier,
+                browser_profile_fallback_available=browser_profile_fallback_available,
+            )
         else:
-            records = client.get_employment_history()
+            records = _employment_history_with_fallback(
+                client=client,
+                source=args.source,
+                public_identifier=public_identifier,
+                voyager_fallback_available=voyager_fallback_available,
+                browser_profile_fallback_available=browser_profile_fallback_available,
+                prefer_voyager=not access_token_available,
+            )
         filtered = filter_employment_history(records, years=args.years, today=date.today())
-    except LinkedInApiError as exc:
+    except (LinkedInApiError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     finally:
@@ -1012,6 +1098,80 @@ def _configured_value(cli_value: str | None, env_value: str | None) -> str | Non
         if value is not None and value != "":
             return value
     return None
+
+
+def _configured_public_identifier(args: argparse.Namespace, env: Mapping[str, str]) -> str | None:
+    return _configured_value(
+        getattr(args, "public_id", None),
+        env.get("LINKEDIN_PROFILE_PUBLIC_ID") or env.get("LINKEDIN_VOYAGER_PUBLIC_ID"),
+    )
+
+
+def _configured_cookie_file(args: argparse.Namespace, env: Mapping[str, str]) -> Path | None:
+    path_value = _configured_value(
+        str(getattr(args, "cookie_file", "")) if getattr(args, "cookie_file", None) is not None else None,
+        env.get("LINKEDIN_VOYAGER_COOKIE_FILE"),
+    )
+    return Path(path_value) if path_value is not None else None
+
+
+def _configured_browser_session(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+) -> tuple[str, str, str] | None:
+    browser = _configured_browser(args, env)
+    if browser is None:
+        return None
+
+    try:
+        session = load_voyager_session_from_browser(
+            browser=browser,
+            cookie_file=_configured_cookie_file(args, env),
+        )
+    except (RuntimeError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return None
+
+    return session.li_at, session.jsessionid, session.csrf_token
+
+
+def _has_voyager_fallback(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    *,
+    require_public_id: bool,
+) -> bool:
+    has_session = any(
+        value is not None
+        for value in (
+            _configured_value(getattr(args, "li_at", None), env.get("LINKEDIN_VOYAGER_LI_AT")),
+            _configured_value(getattr(args, "jsessionid", None), env.get("LINKEDIN_VOYAGER_JSESSIONID")),
+            _configured_value(getattr(args, "csrf_token", None), env.get("LINKEDIN_VOYAGER_CSRF_TOKEN")),
+            _configured_value(getattr(args, "browser", None), env.get("LINKEDIN_VOYAGER_BROWSER")),
+        )
+    )
+    if not has_session:
+        return False
+    if not require_public_id:
+        return True
+    return _configured_public_identifier(args, env) is not None
+
+
+def _has_browser_profile_fallback(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    *,
+    require_public_id: bool,
+) -> bool:
+    if _configured_browser(args, env) != "chrome":
+        return False
+    if not require_public_id:
+        return True
+    return _configured_public_identifier(args, env) is not None
+
+
+def _configured_browser(args: argparse.Namespace, env: Mapping[str, str]) -> str | None:
+    return _configured_value(getattr(args, "browser", None), env.get("LINKEDIN_VOYAGER_BROWSER"))
 
 
 def _read_json_file(path: Path) -> object:
@@ -1499,7 +1659,52 @@ def _configured_client(
         getattr(args, "identity_api_version", None),
         env.get("LINKEDIN_IDENTITY_API_VERSION"),
     )
-    if access_token is None:
+    voyager_requested = getattr(args, "source", None) == "voyager-private" or _has_voyager_fallback(
+        args,
+        env,
+        require_public_id=False,
+    )
+    voyager_li_at = _configured_value(getattr(args, "li_at", None), env.get("LINKEDIN_VOYAGER_LI_AT"))
+    voyager_jsessionid = _configured_value(
+        getattr(args, "jsessionid", None),
+        env.get("LINKEDIN_VOYAGER_JSESSIONID"),
+    )
+    voyager_csrf_token = _configured_value(
+        getattr(args, "csrf_token", None),
+        env.get("LINKEDIN_VOYAGER_CSRF_TOKEN"),
+    )
+    if voyager_requested and (voyager_li_at is None or (voyager_csrf_token is None and voyager_jsessionid is None)):
+        browser_session = _configured_browser_session(args, env)
+        if browser_session is None and _configured_value(
+            getattr(args, "browser", None),
+            env.get("LINKEDIN_VOYAGER_BROWSER"),
+        ) is not None:
+            return None
+        if browser_session is not None:
+            browser_li_at, browser_jsessionid, browser_csrf_token = browser_session
+            voyager_li_at = voyager_li_at or browser_li_at
+            voyager_jsessionid = voyager_jsessionid or browser_jsessionid
+            voyager_csrf_token = voyager_csrf_token or browser_csrf_token
+    if getattr(args, "source", None) == "voyager-private":
+        public_identifier = _configured_public_identifier(args, env)
+        missing: list[str] = []
+        if voyager_li_at is None:
+            missing.append("voyager li_at session cookie")
+        if voyager_csrf_token is None and voyager_jsessionid is None:
+            missing.append("voyager CSRF token or JSESSIONID")
+        if public_identifier is None:
+            missing.append("public profile identifier")
+        if missing:
+            print(f"Missing required configuration: {', '.join(missing)}.", file=sys.stderr)
+            return None
+    can_use_voyager_without_access_token = (
+        getattr(args, "command", None) == "profile"
+        and getattr(args, "profile_command", None) == "employment-history"
+        and _configured_public_identifier(args, env) is not None
+        and voyager_li_at is not None
+        and (voyager_csrf_token is not None or voyager_jsessionid is not None)
+    )
+    if access_token is None and not can_use_voyager_without_access_token:
         print("Missing required configuration: access token.", file=sys.stderr)
         return None
     if getattr(args, "source", None) == "identity-me" and identity_api_version is None:
@@ -1509,7 +1714,7 @@ def _configured_client(
         )
         return None
     factory_kwargs: dict[str, str] = {
-        "access_token": access_token,
+        "access_token": access_token or "",
         "api_version": api_version or DEFAULT_API_VERSION,
     }
     if identity_api_version is not None and _client_factory_accepts_kwarg(
@@ -1517,6 +1722,12 @@ def _configured_client(
         "identity_api_version",
     ):
         factory_kwargs["identity_api_version"] = identity_api_version
+    if voyager_li_at is not None and _client_factory_accepts_kwarg(client_factory, "voyager_li_at"):
+        factory_kwargs["voyager_li_at"] = voyager_li_at
+    if voyager_jsessionid is not None and _client_factory_accepts_kwarg(client_factory, "voyager_jsessionid"):
+        factory_kwargs["voyager_jsessionid"] = voyager_jsessionid
+    if voyager_csrf_token is not None and _client_factory_accepts_kwarg(client_factory, "voyager_csrf_token"):
+        factory_kwargs["voyager_csrf_token"] = voyager_csrf_token
     return cast(
         LinkedInPostClient,
         client_factory(**factory_kwargs),
@@ -1548,9 +1759,135 @@ def _default_client_factory(
     access_token: str,
     api_version: str,
     identity_api_version: str | None = None,
+    voyager_li_at: str | None = None,
+    voyager_jsessionid: str | None = None,
+    voyager_csrf_token: str | None = None,
 ) -> LinkedInClient:
     return LinkedInClient(
         access_token=access_token,
         api_version=api_version,
         identity_api_version=identity_api_version,
+        voyager_li_at=voyager_li_at,
+        voyager_jsessionid=voyager_jsessionid,
+        voyager_csrf_token=voyager_csrf_token,
     )
+
+
+def _run_profile_voyager_session(
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+) -> int:
+    browser = _configured_value(getattr(args, "browser", None), env.get("LINKEDIN_VOYAGER_BROWSER")) or "chrome"
+    cookie_file = _configured_cookie_file(args, env)
+    public_identifier = _configured_public_identifier(args, env)
+    try:
+        session = load_voyager_session_from_browser(
+            browser=browser,
+            cookie_file=cookie_file,
+        )
+    except (RuntimeError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    if args.format == "json":
+        print(
+            json.dumps(
+                {
+                    "browser": session.browser,
+                    "li_at": session.li_at,
+                    "jsessionid": session.jsessionid,
+                    "csrf_token": session.csrf_token,
+                    "public_id": public_identifier,
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    exports = {
+        "LINKEDIN_VOYAGER_LI_AT": session.li_at,
+        "LINKEDIN_VOYAGER_JSESSIONID": session.jsessionid,
+        "LINKEDIN_VOYAGER_CSRF_TOKEN": session.csrf_token,
+    }
+    if public_identifier is not None:
+        exports["LINKEDIN_PROFILE_PUBLIC_ID"] = public_identifier
+    for key, value in exports.items():
+        print(f"export {key}={shlex.quote(value)}")
+    return 0
+
+
+def _employment_history_with_fallback(
+    *,
+    client: LinkedInPostClient,
+    source: str,
+    public_identifier: str | None,
+    voyager_fallback_available: bool,
+    browser_profile_fallback_available: bool,
+    prefer_voyager: bool,
+) -> list[dict[str, object]]:
+    if prefer_voyager and voyager_fallback_available and public_identifier is not None:
+        return _voyager_employment_with_browser_fallback(
+            client=client,
+            public_identifier=public_identifier,
+            browser_profile_fallback_available=browser_profile_fallback_available,
+        )
+
+    try:
+        if source == "identity-me":
+            official_records = client.get_current_employment()
+        else:
+            official_records = client.get_employment_history()
+    except LinkedInApiError:
+        if public_identifier is None or (
+            not voyager_fallback_available and not browser_profile_fallback_available
+        ):
+            raise
+        return _voyager_or_browser_employment_history(
+            client=client,
+            public_identifier=public_identifier,
+            voyager_fallback_available=voyager_fallback_available,
+            browser_profile_fallback_available=browser_profile_fallback_available,
+        )
+
+    if official_records or public_identifier is None:
+        return official_records
+    if not voyager_fallback_available and not browser_profile_fallback_available:
+        return official_records
+    return _voyager_or_browser_employment_history(
+        client=client,
+        public_identifier=public_identifier,
+        voyager_fallback_available=voyager_fallback_available,
+        browser_profile_fallback_available=browser_profile_fallback_available,
+    )
+
+
+def _voyager_employment_with_browser_fallback(
+    *,
+    client: LinkedInPostClient,
+    public_identifier: str,
+    browser_profile_fallback_available: bool,
+) -> list[dict[str, object]]:
+    try:
+        return client.get_voyager_employment_history(public_identifier)
+    except LinkedInApiError:
+        if not browser_profile_fallback_available:
+            raise
+        return load_employment_history_from_chrome_profile(public_identifier)
+
+
+def _voyager_or_browser_employment_history(
+    *,
+    client: LinkedInPostClient,
+    public_identifier: str,
+    voyager_fallback_available: bool,
+    browser_profile_fallback_available: bool,
+) -> list[dict[str, object]]:
+    if voyager_fallback_available:
+        return _voyager_employment_with_browser_fallback(
+            client=client,
+            public_identifier=public_identifier,
+            browser_profile_fallback_available=browser_profile_fallback_available,
+        )
+    if browser_profile_fallback_available:
+        return load_employment_history_from_chrome_profile(public_identifier)
+    return []

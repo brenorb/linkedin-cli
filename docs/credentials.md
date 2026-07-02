@@ -36,6 +36,16 @@ export LINKEDIN_API_VERSION='202606'
 
 # Required for `--source identity-me`: Verified on LinkedIn `/rest/identityMe` release track.
 export LINKEDIN_IDENTITY_API_VERSION='202510.03'
+
+# Required for `profile employment-history --source voyager-private`.
+export LINKEDIN_PROFILE_PUBLIC_ID=''
+export LINKEDIN_VOYAGER_LI_AT=''
+export LINKEDIN_VOYAGER_JSESSIONID=''
+# Optional if `LINKEDIN_VOYAGER_JSESSIONID` is set; otherwise provide it explicitly.
+export LINKEDIN_VOYAGER_CSRF_TOKEN=''
+# Optional browser-backed session loading for voyager-private.
+export LINKEDIN_VOYAGER_BROWSER=''
+export LINKEDIN_VOYAGER_COOKIE_FILE=''
 EOF
 
 chmod 600 ~/.config/lkdn/env.sh
@@ -79,6 +89,9 @@ Avoid storing tokens in tracked repo files.
 - `organization preflight` additionally uses restricted `rw_organization_admin`, because LinkedIn exposes the action-level answers through `GET /rest/organizationAuthorizations/{key}` rather than through ACL rows alone.
 - `profile whoami --source identity-me` uses `/rest/identityMe`, which requires the Verified on LinkedIn product on the app plus `r_profile_basicinfo` instead of OIDC `openid profile`. Development tier is admin-only, and Lite/Development versions should follow the Verified on LinkedIn release notes.
 - `profile whoami --source profile-api` uses `/v2/me`, which is a different identity source from both OIDC `userinfo` and `identity-me`.
+- `profile employment-history --public-id <id> --browser chrome` tries the official API first, then Voyager, then the live Chrome profile page when the API paths are unavailable or return no records.
+- `profile employment-history --source voyager-private` uses the web-only Voyager endpoint under `https://www.linkedin.com/voyager/api/...`, not the official OAuth API host. It expects `LINKEDIN_PROFILE_PUBLIC_ID`, `LINKEDIN_VOYAGER_LI_AT`, and either `LINKEDIN_VOYAGER_JSESSIONID` or `LINKEDIN_VOYAGER_CSRF_TOKEN`.
+- `profile employment-history --source voyager-private --browser chrome` can read those cookies from a local Chromium-family browser instead of from env vars. `LINKEDIN_VOYAGER_BROWSER` and `LINKEDIN_VOYAGER_COOKIE_FILE` are the env equivalents. On macOS, Python may prompt for access to the browser cookie store, and the Chrome page fallback needs `View > Developer > Allow JavaScript from Apple Events` enabled.
 
 See [onboarding.md](onboarding.md) for the full step-by-step setup flow.
 

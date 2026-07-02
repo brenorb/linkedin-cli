@@ -305,6 +305,12 @@ Read employment data through official profile APIs:
 uv run lkdn profile employment-history
 ```
 
+If you also pass a LinkedIn public profile id plus `--browser chrome`, `lkdn` now tries the official API first, then Voyager, then the live Chrome profile page when the API paths are unavailable or empty:
+
+```bash
+uv run lkdn profile employment-history --public-id brenorb --browser chrome
+```
+
 Use the Verified on LinkedIn `identityMe` endpoint instead:
 
 ```bash
@@ -315,6 +321,26 @@ Limit output to a different lookback window:
 
 ```bash
 uv run lkdn profile employment-history --years 3
+```
+
+Use the Voyager path directly only when you want to bypass the official API entirely:
+
+```bash
+uv run lkdn profile employment-history --source voyager-private --public-id brenorb
+```
+
+Load the Voyager cookies directly from your local Chrome profile instead of exporting them manually:
+
+```bash
+uv run lkdn profile employment-history --source voyager-private --browser chrome --public-id brenorb
+```
+
+On macOS, the last-resort Chrome page fallback needs `View > Developer > Allow JavaScript from Apple Events` enabled in Chrome.
+
+Or print shell exports for the current browser session:
+
+```bash
+uv run lkdn profile voyager-session --browser chrome --public-id brenorb
 ```
 
 ## Docs
@@ -387,6 +413,8 @@ For employment data, the official API surface is constrained:
 - `GET /rest/identityMe` also requires the Verified on LinkedIn product on the app itself. LinkedIn documents `403 No valid API product assigned` when that product is missing.
 - `positions` on the Profile API are part of the older `r_fullprofile` permission set, and LinkedIn documents that access to `r_fullprofile` is closed.
 - This means `profile employment-history` is only useful if your app already has the required restricted profile access; otherwise LinkedIn will return limited data or a permission error.
+- `--source voyager-private` instead reads `https://www.linkedin.com/voyager/api/identity/profiles/{publicId}/profileView` with LinkedIn web-session cookies (`li_at` plus `JSESSIONID` or a matching CSRF token). That flow is intentionally separate from the official OAuth API surface above.
+- `--browser chrome` (or `profile voyager-session`) loads those cookies from a local Chromium-family browser via `browser-cookie3`. On macOS this may prompt for access to the browser cookie store.
 
 Official docs:
 
