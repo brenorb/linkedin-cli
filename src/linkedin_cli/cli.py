@@ -733,6 +733,12 @@ def main(
     )
     args = parser.parse_args(argv_list)
     environment = dict(os.environ if env is None else env)
+    if getattr(args, "access_token_file", None) is not None:
+        try:
+            args.access_token = _read_access_token(args.access_token_file)
+        except (OSError, UnicodeError, ValueError) as error:
+            print(str(error), file=sys.stderr)
+            return 2
 
     if args.command == "post":
         return _run_post(args, environment, client_factory or _default_client_factory)
@@ -1036,7 +1042,27 @@ def _add_post_create_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_access_token_argument(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--access-token", help="OAuth access token")
+    sources = parser.add_mutually_exclusive_group()
+    sources.add_argument(
+        "--access-token", help="OAuth token (prefer --access-token-file to avoid exposing secrets in argv)"
+    )
+    sources.add_argument(
+        "--access-token-file", type=Path,
+        help="Read one OAuth token line from a UTF-8 file, or - for piped stdin; never prompts",
+    )
+
+
+def _read_access_token(path: Path) -> str:
+    if path == Path("-") and sys.stdin.isatty():
+        raise ValueError("--access-token-file - requires a pipe or file redirect; never prompts.")
+    try:
+        contents = sys.stdin.read() if path == Path("-") else path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        raise ValueError("Cannot read --access-token-file. Check the file path and UTF-8 encoding.") from None
+    token = contents.removesuffix("\n").removesuffix("\r")
+    if not token.strip() or "\n" in token or "\r" in token:
+        raise ValueError("--access-token-file requires one nonempty token line.")
+    return token
 
 
 def _add_api_version_argument(parser: argparse.ArgumentParser) -> None:

@@ -41,7 +41,22 @@ Command names:
 
 ## Usage
 
-Set the required environment variables:
+For agents and scripts, read the OAuth token from a private UTF-8 file. Keep the
+file readable only by your user (for example, mode `0600`), with one token line:
+
+```bash
+uv run lkdn profile whoami --access-token-file ~/.config/lkdn/token
+uv run lkdn profile whoami --access-token-file - < ~/.config/lkdn/token
+```
+
+These paths never prompt. The explicit file/stdin source overrides the environment;
+an unreadable, empty, or multiline source fails before creating an API client and
+does not fall back to another credential. Do not combine `--access-token-file`
+with `--access-token`. Direct token flags remain compatible with existing scripts,
+but can expose credentials in shell history and process listings. Environment
+variables remain supported, though protected files are preferable for secrets.
+
+Set the author/API version and, if needed for existing workflows, the token fallback:
 
 ```bash
 export LINKEDIN_ACCESS_TOKEN="..."
@@ -188,7 +203,7 @@ You can also pass values as flags:
 
 ```bash
 uv run lkdn post \
-  --access-token "..." \
+  --access-token-file ~/.config/lkdn/token \
   --author "urn:li:person:YOUR_ID" \
   --api-version "YYYYMM" \
   "Shipping a tiny CLI."
