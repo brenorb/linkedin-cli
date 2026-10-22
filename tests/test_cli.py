@@ -1571,6 +1571,8 @@ def test_cli_comment_delete_uses_comment_id_and_optional_actor(
             "delete",
             "urn:li:share:123",
             "456",
+            "--confirm",
+            "456",
             "--actor",
             "urn:li:organization:123",
         ],
@@ -1990,6 +1992,8 @@ def test_cli_social_metadata_set_comments_state_uses_actor_and_state(
             "urn:li:person:abc",
             "--state",
             "CLOSED",
+            "--confirm",
+            "urn:li:share:123",
         ],
         env={
             "LINKEDIN_ACCESS_TOKEN": "env-token",
@@ -2497,7 +2501,7 @@ def test_cli_post_delete_reads_access_token_and_deletes_post(
         return StubClient()
 
     exit_code = main(
-        ["post", "delete", "urn:li:share:987"],
+        ["post", "delete", "urn:li:share:987", "--confirm", "urn:li:share:987"],
         env={
             "LINKEDIN_ACCESS_TOKEN": "env-token",
             "LINKEDIN_API_VERSION": "202505",

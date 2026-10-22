@@ -267,7 +267,7 @@ uv run lkdn comment list "urn:li:share:123456789"
 uv run lkdn comment batch-get "urn:li:share:123456789" "456" "789"
 uv run lkdn comment create "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" "Hello world"
 uv run lkdn comment edit "urn:li:share:123456789" "456" --text "Updated comment"
-uv run lkdn comment delete "urn:li:share:123456789" "456"
+uv run lkdn comment delete "urn:li:share:123456789" "456" --confirm "456"
 uv run lkdn reaction get --actor "urn:li:person:YOUR_ID" --entity "urn:li:share:123456789"
 uv run lkdn reaction create --actor "urn:li:person:YOUR_ID" --root "urn:li:share:123456789" --type LIKE
 uv run lkdn reaction list "urn:li:share:123456789"
@@ -275,7 +275,7 @@ uv run lkdn reaction batch-get --key "urn:li:person:YOUR_ID" "urn:li:share:12345
 uv run lkdn reaction delete --actor "urn:li:person:YOUR_ID" --entity "urn:li:share:123456789"
 uv run lkdn social-metadata get "urn:li:share:123456789"
 uv run lkdn social-metadata batch-get "urn:li:share:123456789" "urn:li:comment:(urn:li:share:123456789,456)"
-uv run lkdn social-metadata set-comments-state "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" --state CLOSED
+uv run lkdn social-metadata set-comments-state "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" --state CLOSED --confirm "urn:li:share:123456789"
 ```
 
 Inspect the authenticated member identity:
@@ -305,8 +305,23 @@ uv run lkdn post edit "urn:li:share:123456789" \
 Delete a post by URN:
 
 ```bash
-uv run lkdn post delete "urn:li:share:123456789"
+uv run lkdn post delete "urn:li:share:123456789" --dry-run
+uv run lkdn post delete "urn:li:share:123456789" --confirm "urn:li:share:123456789"
 ```
+
+Deleting posts/comments and switching a thread to `CLOSED` require explicit
+confirmation, including in existing scripts: repeat the post/thread URN with
+`--confirm`, or the comment ID for `comment delete`. Closing a thread deletes its
+existing comments. An absent or mismatched confirmation exits `2` before creating
+an API client. Reopening comments (`OPEN`) does not need confirmation.
+
+All three commands support `--dry-run`: it exits `0` with a JSON plan on stdout,
+without reading credentials or sending requests. The plan describes the local
+arguments; it does not verify remote existence, permissions, or reversibility.
+Actual operations still require credentials and use the normal exit codes (`0`
+on success, `1` on API failure, `2` on invalid configuration). These commands never
+ask interactive questions, so agents can preview, inspect the target, and issue
+a separate confirmed invocation.
 
 If your post text starts with a reserved action word such as `get`, `list`, or `delete`, use the explicit alias:
 

@@ -313,6 +313,7 @@ def build_parser(
 
         delete_parser = post_subparsers.add_parser("delete", help="Delete a post by URN")
         delete_parser.add_argument("post_urn", help="Post URN, for example urn:li:share:123")
+        _add_mutation_safety_arguments(delete_parser, "post URN")
         _add_access_token_argument(delete_parser)
         _add_api_version_argument(delete_parser)
         delete_parser.set_defaults(post_command="delete")
@@ -522,6 +523,7 @@ def build_parser(
     comment_delete_parser = comment_subparsers.add_parser("delete", help="Delete a comment by ID")
     comment_delete_parser.add_argument("target_urn", help="Root share or ugcPost URN for the social action")
     comment_delete_parser.add_argument("comment_id", help="Comment ID within the social action")
+    _add_mutation_safety_arguments(comment_delete_parser, "comment ID")
     comment_delete_parser.add_argument("--actor", help="Optional actor URN; required for some org flows")
     _add_access_token_argument(comment_delete_parser)
     _add_api_version_argument(comment_delete_parser)
@@ -615,6 +617,7 @@ def build_parser(
         help="Open or close comments on a thread; closing deletes existing comments",
     )
     social_metadata_update_parser.add_argument("entity_urn", help="Thread URN, for example a share or ugcPost URN")
+    _add_mutation_safety_arguments(social_metadata_update_parser, "thread URN (required for CLOSED)")
     social_metadata_update_parser.add_argument("--actor", required=True, help="Actor URN performing the update")
     social_metadata_update_parser.add_argument(
         "--state",
@@ -733,6 +736,9 @@ def main(
     )
     args = parser.parse_args(argv_list)
     environment = dict(os.environ if env is None else env)
+    preflight = _preflight_mutation(args)
+    if preflight is not None:
+        return preflight
     if getattr(args, "access_token_file", None) is not None:
         try:
             args.access_token = _read_access_token(args.access_token_file)
@@ -1039,6 +1045,46 @@ def _add_post_create_arguments(parser: argparse.ArgumentParser) -> None:
     _add_access_token_argument(parser)
     _add_api_version_argument(parser)
     parser.add_argument("--visibility", default="PUBLIC", help="LinkedIn post visibility")
+
+
+def _add_mutation_safety_arguments(parser: argparse.ArgumentParser, target_label: str) -> None:
+    parser.add_argument("--confirm", metavar="TARGET", help=f"Repeat the {target_label} to authorize the change; never prompts")
+    parser.add_argument("--dry-run", action="store_true", help="Print the action plan as JSON without reading credentials or contacting LinkedIn")
+
+
+def _preflight_mutation(args: argparse.Namespace) -> int | None:
+    plan: dict[str, object]
+    required = True
+    if args.command == "post" and args.post_command == "delete":
+        target = args.post_urn
+        plan = {"action": "post.delete", "target": target}
+    elif args.command == "comment" and args.comment_command == "delete":
+        if _is_comment_urn(args.target_urn):
+            print("Comment deletes require a share or ugcPost URN, not a comment URN.", file=sys.stderr)
+            return 2
+        target = args.comment_id
+        plan = {"action": "comment.delete", "target": args.target_urn, "comment_id": target, "actor": args.actor}
+    elif args.command == "social-metadata" and args.social_metadata_command == "set-comments-state":
+        if _is_comment_urn(args.entity_urn):
+            print("Comments-state updates require a thread URN, not a comment URN.", file=sys.stderr)
+            return 2
+        target = args.entity_urn
+        required = args.comments_state == "CLOSED"
+        plan = {"action": "social-metadata.set-comments-state", "target": target,
+                "actor": args.actor, "state": args.comments_state}
+        if required:
+            plan["warning"] = "Closing comments deletes existing comments on this thread."
+    else:
+        return None
+    plan["requires_confirmation"] = required
+    if args.dry_run:
+        print(json.dumps(plan, indent=2))
+        return 0
+    if required and args.confirm != target:
+        print(f"Refusing destructive action: repeat the target with --confirm {target}. "
+              "Use --dry-run to inspect the JSON plan. No request was sent.", file=sys.stderr)
+        return 2
+    return None
 
 
 def _add_access_token_argument(parser: argparse.ArgumentParser) -> None:
