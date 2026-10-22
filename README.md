@@ -41,7 +41,22 @@ Command names:
 
 ## Usage
 
-Set the required environment variables:
+For agents and scripts, read the OAuth token from a private UTF-8 file. Keep the
+file readable only by your user (for example, mode `0600`), with one token line:
+
+```bash
+uv run lkdn profile whoami --access-token-file ~/.config/lkdn/token
+uv run lkdn profile whoami --access-token-file - < ~/.config/lkdn/token
+```
+
+These paths never prompt. The explicit file/stdin source overrides the environment;
+an unreadable, empty, or multiline source fails before creating an API client and
+does not fall back to another credential. Do not combine `--access-token-file`
+with `--access-token`. Direct token flags remain compatible with existing scripts,
+but can expose credentials in shell history and process listings. Environment
+variables remain supported, though protected files are preferable for secrets.
+
+Set the author/API version and, if needed for existing workflows, the token fallback:
 
 ```bash
 export LINKEDIN_ACCESS_TOKEN="..."
@@ -188,7 +203,7 @@ You can also pass values as flags:
 
 ```bash
 uv run lkdn post \
-  --access-token "..." \
+  --access-token-file ~/.config/lkdn/token \
   --author "urn:li:person:YOUR_ID" \
   --api-version "YYYYMM" \
   "Shipping a tiny CLI."
@@ -252,7 +267,7 @@ uv run lkdn comment list "urn:li:share:123456789"
 uv run lkdn comment batch-get "urn:li:share:123456789" "456" "789"
 uv run lkdn comment create "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" "Hello world"
 uv run lkdn comment edit "urn:li:share:123456789" "456" --text "Updated comment"
-uv run lkdn comment delete "urn:li:share:123456789" "456"
+uv run lkdn comment delete "urn:li:share:123456789" "456" --confirm "456"
 uv run lkdn reaction get --actor "urn:li:person:YOUR_ID" --entity "urn:li:share:123456789"
 uv run lkdn reaction create --actor "urn:li:person:YOUR_ID" --root "urn:li:share:123456789" --type LIKE
 uv run lkdn reaction list "urn:li:share:123456789"
@@ -260,7 +275,7 @@ uv run lkdn reaction batch-get --key "urn:li:person:YOUR_ID" "urn:li:share:12345
 uv run lkdn reaction delete --actor "urn:li:person:YOUR_ID" --entity "urn:li:share:123456789"
 uv run lkdn social-metadata get "urn:li:share:123456789"
 uv run lkdn social-metadata batch-get "urn:li:share:123456789" "urn:li:comment:(urn:li:share:123456789,456)"
-uv run lkdn social-metadata set-comments-state "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" --state CLOSED
+uv run lkdn social-metadata set-comments-state "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" --state CLOSED --confirm "urn:li:share:123456789"
 ```
 
 Inspect the authenticated member identity:
@@ -290,8 +305,23 @@ uv run lkdn post edit "urn:li:share:123456789" \
 Delete a post by URN:
 
 ```bash
-uv run lkdn post delete "urn:li:share:123456789"
+uv run lkdn post delete "urn:li:share:123456789" --dry-run
+uv run lkdn post delete "urn:li:share:123456789" --confirm "urn:li:share:123456789"
 ```
+
+Deleting posts/comments and switching a thread to `CLOSED` require explicit
+confirmation, including in existing scripts: repeat the post/thread URN with
+`--confirm`, or the comment ID for `comment delete`. Closing a thread deletes its
+existing comments. An absent or mismatched confirmation exits `2` before creating
+an API client. Reopening comments (`OPEN`) does not need confirmation.
+
+All three commands support `--dry-run`: it exits `0` with a JSON plan on stdout,
+without reading credentials or sending requests. The plan describes the local
+arguments; it does not verify remote existence, permissions, or reversibility.
+Actual operations still require credentials and use the normal exit codes (`0`
+on success, `1` on API failure, `2` on invalid configuration). These commands never
+ask interactive questions, so agents can preview, inspect the target, and issue
+a separate confirmed invocation.
 
 If your post text starts with a reserved action word such as `get`, `list`, or `delete`, use the explicit alias:
 
