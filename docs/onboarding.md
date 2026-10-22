@@ -1,6 +1,7 @@
 # LinkedIn onboarding
 
-This guide walks through the full member-posting setup for `lkdn` without exposing your token to anyone else.
+This guide walks through member-posting setup for `lkdn`, private token input,
+and explicit CLI confirmations.
 
 The published PyPI package is `lkdn`. The documented command names are `lkdn` and `linkedin`.
 
@@ -10,7 +11,7 @@ It covers:
 2. configuring OAuth
 3. exchanging an authorization code for a token
 4. deriving `LINKEDIN_AUTHOR_URN`
-5. saving local environment variables
+5. saving credentials locally and configuring optional environment variables
 6. verifying text, image, and video posts
 7. verifying article, document, and multi-image posts
 8. verifying organization preflight and the authenticated member identity
@@ -45,6 +46,44 @@ Post-management support also splits along member versus organization and read ve
 - `organization preflight` uses the ACL finder for context and the official organization-authorizations endpoint for exact org-authorization checks on post-management actions.
 - `profile whoami` defaults to OIDC `GET /v2/userinfo` and derives `urn:li:person:{sub}` for convenience.
 
+## Agent credentials and confirmations
+
+After OAuth, keep one token line in `~/.config/lkdn/token` as a private UTF-8
+file (directory mode `0700`, file mode `0600`). For noninteractive agent calls:
+
+```bash
+uv run lkdn profile whoami --access-token-file ~/.config/lkdn/token
+uv run lkdn profile whoami --access-token-file - < ~/.config/lkdn/token
+```
+
+Neither form prompts. A file leaves stdin available; `-` reads piped stdin until
+EOF and refuses a terminal. Explicit file/stdin input overrides
+`LINKEDIN_ACCESS_TOKEN`; invalid input exits `2` before any request and does not
+fall back. `--access-token-file` and `--access-token` are mutually exclusive.
+The direct token flag and the environment-based OAuth examples below remain
+compatible with older scripts; prefer files for agent calls to keep tokens out
+of shell history and process arguments.
+
+Deleting a post/comment or closing comments requires explicit target
+confirmation, including in scripts. Repeat the post/thread URN, or the comment
+ID for comment deletion. Closing comments deletes existing comments. Reopening
+with `--state OPEN` does not need confirmation.
+
+```bash
+uv run lkdn post delete "urn:li:share:123456789" --dry-run
+uv run lkdn post delete "urn:li:share:123456789" --confirm "urn:li:share:123456789" --access-token-file ~/.config/lkdn/token
+uv run lkdn comment delete "urn:li:share:123456789" "456" --confirm "456" --access-token-file ~/.config/lkdn/token
+uv run lkdn social-metadata set-comments-state "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" --state CLOSED --confirm "urn:li:share:123456789" --access-token-file ~/.config/lkdn/token
+```
+
+All three operations support `--dry-run`, which exits `0` with a JSON action
+plan, without reading credentials or making requests. It does not validate
+remote existence or permissions. A missing or mismatched `--confirm` on a real
+destructive invocation exits `2` before reading credentials or creating a
+client; no interactive question is asked. Add a separate confirmed invocation
+after inspecting the plan. See [credentials.md](credentials.md) for source
+precedence and environment compatibility.
+
 ## Command matrix
 
 | Command | Works for member URNs | Works for organization URNs | Required scope family |
@@ -57,7 +96,7 @@ Post-management support also splits along member versus organization and read ve
 | `lkdn post --multi-image ...` | Yes | Yes, for the post itself | `w_member_social` for members, `w_organization_social` for organizations; company-owned image uploads can additionally require `ADMINISTRATOR` or `DIRECT_SPONSORED_CONTENT_POSTER` |
 | `lkdn post --multi-image-urn ...` | Yes | Yes, for the post itself | `w_member_social` for members, `w_organization_social` for organizations; org-owned image assets still follow LinkedIn's stricter image-owner rules |
 | `lkdn post edit <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
-| `lkdn post delete <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
+| `lkdn post delete <post-urn> --confirm <post-urn>` | Yes | Yes | `w_member_social` for members, `w_organization_social` for organizations |
 | `lkdn post get <post-urn>` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
 | `lkdn post batch-get <post-urn>...` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
 | `lkdn post list [--author ...]` | Only when LinkedIn has granted restricted member read access | Yes, when your app has organization read access | `r_member_social` for members, `r_organization_social` for organizations |
@@ -76,12 +115,12 @@ Notes:
 
 - `LINKEDIN_AUTHOR_URN` is used by `post create` and `post list`. It can be either `urn:li:person:...` or `urn:li:organization:...`.
 - `LINKEDIN_MEMBER_URN` is used by `organization preflight`. It should always be `urn:li:person:...` and must match the authenticated viewer.
-- `post get` and `post delete` only need the post URN plus a valid access token and API version.
+- `post get` and `post delete` use a post URN and a valid access token from any supported source. API version can use the CLI default or an override. Deletion also requires `--confirm <post-urn>`; `--dry-run` requires no credentials.
 - `comment get`, `comment list`, `comment batch-get`, `reaction ...`, and `social-metadata ...` also work without `LINKEDIN_AUTHOR_URN`; they use explicit URNs in the command itself.
 - `comment create`, `comment edit`, and `comment delete` also do not need `LINKEDIN_AUTHOR_URN`.
 - `comment create` requires explicit `--actor`.
 - `comment create --parent-comment ...` supports replies, but LinkedIn does not allow reply content entities, so `--content-image-urn` is only valid on non-reply comments.
-- `comment edit` and `comment delete` accept optional `--actor`, which some org flows require.
+- `comment edit` and `comment delete` accept optional `--actor`, which some org flows require. Comment deletion also requires `--confirm <comment-id>`.
 - `post edit` supports commentary plus the content CTA fields exposed by LinkedIn's partial-update surface.
 - `post batch-get` is the supported multi-read surface for posts. `post list` remains the `q=author` finder and LinkedIn documents `100` as its max count.
 - `image list`, `document list`, and `video list` are batch-get-by-URN helpers. They are not owner discovery commands because LinkedIn documents sponsored-account-specific finders for those asset APIs.
@@ -96,7 +135,7 @@ Notes:
 - The newer comments, reactions, and social-metadata endpoints use the `*_social_feed` scope family, not the Posts API `*_social` scopes.
 - `reaction delete` and `social-metadata set-comments-state` are feed-write operations even though they do not create a post.
 - `comment edit`, `comment delete`, and `social-metadata set-comments-state` are intentionally stricter about thread targeting than read commands: they require a thread URN, not a comment URN.
-- `social-metadata set-comments-state --state CLOSED` is destructive on the official API: LinkedIn deletes the thread's existing comments when it closes comments.
+- `social-metadata set-comments-state --state CLOSED` is destructive on the official API: LinkedIn deletes the thread's existing comments when it closes comments. The CLI requires `--confirm <thread-urn>` for this state.
 - For organization authors, feed-write roles are not identical to org post-write roles. LinkedIn documents `RECRUITING_POSTER` on the feed-write side, while org post creation/editing uses the separate content-admin/posting role model.
 - LinkedIn's current Posts API models mentions and annotations inline in the commentary text itself, so `lkdn` keeps commentary input as text rather than inventing a second mention DSL.
 - For comment write operations, `lkdn` exposes the official mention/content payloads through `--attributes-json` and `--content-image-urn` instead of inventing a bespoke mention syntax.

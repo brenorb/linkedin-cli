@@ -1,16 +1,60 @@
 # Credentials and local environment
 
-This project expects three environment variables at runtime:
+Configuration can come from command flags or environment variables. Agents do
+not need to export a token or answer an interactive prompt.
 
-- `LINKEDIN_ACCESS_TOKEN`
-- `LINKEDIN_AUTHOR_URN`
-- `LINKEDIN_API_VERSION`
+## Preferred token input for agents
+
+Keep one OAuth token line in a private UTF-8 file, for example
+`~/.config/lkdn/token`, with directory mode `0700` and file mode `0600`:
+
+```bash
+uv run lkdn profile whoami --access-token-file ~/.config/lkdn/token
+uv run lkdn profile whoami --access-token-file - < ~/.config/lkdn/token
+```
+
+The file source leaves stdin available; `-` consumes piped stdin until EOF and
+refuses terminal input instead of prompting. An explicit file/stdin source
+overrides `LINKEDIN_ACCESS_TOKEN`. An unreadable, empty, or multiline source
+exits `2` without creating an API client or falling back to another token.
+`--access-token-file` and the legacy `--access-token` flag cannot be combined.
+Direct token flags and `LINKEDIN_ACCESS_TOKEN` remain supported for existing
+scripts; prefer the file source to avoid exposing tokens in shell history,
+process arguments, or inherited environments.
+
+## Confirmations and offline previews
+
+`post delete` requires `--confirm` repeating the post URN. `comment delete`
+requires the comment ID instead. Setting comments to `CLOSED` requires the
+thread URN and deletes existing comments; `OPEN` does not require confirmation.
+These commands never prompt. An absent or mismatched confirmation exits `2`
+before reading credentials or creating an API client.
+
+```bash
+uv run lkdn post delete "urn:li:share:123456789" --dry-run
+uv run lkdn post delete "urn:li:share:123456789" --confirm "urn:li:share:123456789" --access-token-file ~/.config/lkdn/token
+uv run lkdn comment delete "urn:li:share:123456789" "456" --confirm "456" --access-token-file ~/.config/lkdn/token
+uv run lkdn social-metadata set-comments-state "urn:li:share:123456789" --actor "urn:li:person:YOUR_ID" --state CLOSED --confirm "urn:li:share:123456789" --access-token-file ~/.config/lkdn/token
+```
+
+All three operations support `--dry-run`: exit `0`, one JSON plan on stdout,
+no credential reads or API requests. Plans describe local arguments and do not
+verify remote existence, authorization, or reversibility. Agents can inspect a
+plan and then issue a separate confirmed invocation with credentials.
+
+## Compatible environment configuration
+
+Existing environment-based workflows remain supported:
+
+- `LINKEDIN_ACCESS_TOKEN`: fallback when no explicit token flag/file is supplied
+- `LINKEDIN_AUTHOR_URN`: author for commands that need one, such as post create/list
+- `LINKEDIN_API_VERSION`: optional API-version override; the CLI has a built-in default
 
 Some commands also use:
 
 - `LINKEDIN_MEMBER_URN` for `organization preflight`
 
-Recommended local setup:
+Local setup for optional OAuth/environment-based workflows:
 
 ```bash
 mkdir -p ~/.config/lkdn
@@ -57,19 +101,20 @@ Load it when needed:
 source ~/.config/lkdn/env.sh
 ```
 
-Good storage options:
+Compatibility storage options for this shell environment file:
 
 - `~/.config/lkdn/env.sh`
 - `~/.zshrc` if you want values loaded in every shell
 - another local secrets file that you source manually
 
-Avoid storing tokens in tracked repo files.
+Avoid storing tokens in tracked repo files. Prefer the private token file above
+for agent calls instead of loading credentials into every shell.
 
 ## Notes
 
 - `LINKEDIN_AUTHOR_URN` can look like `urn:li:person:abc123` or `urn:li:organization:123456`, depending on whether `post create` or `post list` should act as a member or organization.
 - `LINKEDIN_MEMBER_URN` should stay in member form, for example `urn:li:person:abc123`, because `organization preflight` uses it to build the official `organizationAuthorizations` impersonator key. It must match the authenticated viewer.
-- `post get` and `post delete` do not read `LINKEDIN_AUTHOR_URN`; they only need the post URN plus `LINKEDIN_ACCESS_TOKEN`.
+- `post get` and `post delete` do not read `LINKEDIN_AUTHOR_URN`. Real requests need the post URN and a token from a file/stdin, a direct flag, or the environment. Deletion additionally requires `--confirm <post-urn>`; `--dry-run` needs no token.
 - `comment get`, `reaction create`, and `social-metadata get` also do not read `LINKEDIN_AUTHOR_URN`.
 - `uv run lkdn profile whoami` is the fastest way in this repo to derive the member-form `LINKEDIN_AUTHOR_URN` from OIDC `userinfo`.
 - `uv run lkdn organization preflight "urn:li:organization:123456"` is the fastest way in this repo to confirm whether the current member URN can create, read-as-author, edit, or delete organic org posts.
