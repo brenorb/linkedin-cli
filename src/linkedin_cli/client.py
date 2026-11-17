@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import mimetypes
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,10 @@ class LinkedInApiError(RuntimeError):
         super().__init__(f"LinkedIn API request failed with status {status_code}: {message}")
         self.status_code = status_code
         self.message = message
+
+
+class AssetProcessingFailedError(LinkedInApiError):
+    """Raised when LinkedIn could not process an uploaded asset; it cannot be reused."""
 
 
 @dataclass(slots=True)
@@ -757,20 +762,16 @@ class LinkedInClient:
         if alt_text:
             media["altText"] = alt_text
 
-        payload = _post_payload(
-            author=author,
-            commentary=commentary,
-            visibility=visibility,
-            content={"media": media},
+        return _after_upload(
+            image_urn,
+            "--image-urn",
+            lambda: self._create_media_post(
+                author=author,
+                commentary=commentary,
+                visibility=visibility,
+                media=media,
+            ),
         )
-
-        response = self._client.post("/rest/posts", json=payload)
-        if response.is_error:
-            raise LinkedInApiError(response.status_code, _extract_error_message(response))
-
-        body = _response_json(response)
-        post_id = response.headers.get("x-restli-id") or body.get("id")
-        return PostCreationResult(post_id=post_id, response=body)
 
     def create_image_post_from_asset(
         self,
@@ -803,18 +804,21 @@ class LinkedInClient:
     ) -> PostCreationResult:
         document_urn, upload_url = self._initialize_document_upload(owner=author)
         self._upload_file(upload_url=upload_url, file_path=Path(document_path))
-        self._wait_for_asset_availability(
-            path_prefix="/rest/documents",
-            asset_urn=document_urn,
-            label="Document",
-        )
 
-        return self._create_media_post(
-            author=author,
-            commentary=commentary,
-            visibility=visibility,
-            media={"id": document_urn, "title": title},
-        )
+        def finish() -> PostCreationResult:
+            self._wait_for_asset_availability(
+                path_prefix="/rest/documents",
+                asset_urn=document_urn,
+                label="Document",
+            )
+            return self._create_media_post(
+                author=author,
+                commentary=commentary,
+                visibility=visibility,
+                media={"id": document_urn, "title": title},
+            )
+
+        return _after_upload(document_urn, "--document-urn", finish)
 
     def create_document_post_from_asset(
         self,
@@ -956,26 +960,20 @@ class LinkedInClient:
             upload_token=upload_token,
             uploaded_part_ids=uploaded_part_ids,
         )
-        self._wait_for_video_availability(video_urn=video_urn)
-
         media: dict[str, Any] = {"id": video_urn}
         if title:
             media["title"] = title
 
-        payload = _post_payload(
-            author=author,
-            commentary=commentary,
-            visibility=visibility,
-            content={"media": media},
-        )
+        def finish() -> PostCreationResult:
+            self._wait_for_video_availability(video_urn=video_urn)
+            return self._create_media_post(
+                author=author,
+                commentary=commentary,
+                visibility=visibility,
+                media=media,
+            )
 
-        response = self._client.post("/rest/posts", json=payload)
-        if response.is_error:
-            raise LinkedInApiError(response.status_code, _extract_error_message(response))
-
-        body = _response_json(response)
-        post_id = response.headers.get("x-restli-id") or body.get("id")
-        return PostCreationResult(post_id=post_id, response=body)
+        return _after_upload(video_urn, "--video-urn", finish)
 
     def create_video_post_from_asset(
         self,
@@ -1197,7 +1195,7 @@ class LinkedInClient:
                     reason = body.get(failure_reason_key)
                     if isinstance(reason, str) and reason:
                         message = f"{message}: {reason}"
-                raise LinkedInApiError(response.status_code, message)
+                raise AssetProcessingFailedError(response.status_code, message)
             if status not in {"WAITING_UPLOAD", "PROCESSING"}:
                 raise LinkedInApiError(response.status_code, f"Unexpected {label.lower()} status: {status!r}")
             if time.monotonic() >= deadline:
@@ -1237,6 +1235,26 @@ class LinkedInClient:
             raise LinkedInApiError(response.status_code, _extract_error_message(response))
 
         return _response_json(response)
+
+
+def _after_upload(
+    asset_urn: str, reuse_flag: str, finish: Callable[[], PostCreationResult]
+) -> PostCreationResult:
+    """Run the steps after an upload and name the uploaded asset if they fail.
+
+    The upload is the slow part. Once LinkedIn holds the bytes, a processing
+    timeout or a failed post must not send the user back to upload them again.
+    """
+    try:
+        return finish()
+    except AssetProcessingFailedError:
+        raise
+    except LinkedInApiError as exc:
+        raise LinkedInApiError(
+            exc.status_code,
+            f"{exc.message}. The upload finished as {asset_urn}; retry with "
+            f"{reuse_flag} {asset_urn} to post it without uploading again.",
+        ) from exc
 
 
 def _post_payload(

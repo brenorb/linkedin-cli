@@ -2491,3 +2491,55 @@ def test_get_identity_profile_requires_identity_api_version() -> None:
 
     with pytest.raises(ValueError, match="identity API version"):
         client.get_identity_profile()
+
+
+def _video_upload_handler(*, video_status: str, post_status: int):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url == httpx.URL("https://api.linkedin.com/rest/videos?action=initializeUpload"):
+            return httpx.Response(200, json={"value": {
+                "video": "urn:li:video:777",
+                "uploadToken": "upload-token",
+                "uploadInstructions": [{
+                    "uploadUrl": "https://www.linkedin.com/dms-uploads/example/v/0",
+                    "firstByte": 0,
+                    "lastByte": 3,
+                }],
+            }})
+        if request.url == httpx.URL("https://www.linkedin.com/dms-uploads/example/v/0"):
+            return httpx.Response(200, headers={"ETag": "part-1"})
+        if request.url == httpx.URL("https://api.linkedin.com/rest/videos?action=finalizeUpload"):
+            return httpx.Response(200, json={})
+        if request.url == httpx.URL("https://api.linkedin.com/rest/videos/urn%3Ali%3Avideo%3A777"):
+            return httpx.Response(200, json={"id": "urn:li:video:777", "status": video_status})
+        if request.url == httpx.URL("https://api.linkedin.com/rest/posts"):
+            return httpx.Response(post_status, json={"message": "Internal error"})
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    return handler
+
+
+@pytest.mark.parametrize(
+    ("video_status", "post_status"),
+    [("PROCESSING", 201), ("AVAILABLE", 500)],
+    ids=["processing-times-out", "post-creation-fails"],
+)
+def test_video_post_failure_after_upload_names_the_reusable_asset(
+    tmp_path: Path, video_status: str, post_status: int
+) -> None:
+    # UploadFlow.tla ResumableAfterUpload: once the bytes are uploaded, a later
+    # failure must tell the user which asset to reuse instead of uploading again.
+    video_path = tmp_path / "clip.mp4"
+    video_path.write_bytes(b"abcd")
+    client = LinkedInClient(
+        access_token="test-token",
+        api_version="202505",
+        transport=httpx.MockTransport(_video_upload_handler(video_status=video_status, post_status=post_status)),
+        video_wait_timeout=0.0,
+        video_wait_interval=0.0,
+    )
+
+    with pytest.raises(LinkedInApiError) as error:
+        client.create_video_post(author="urn:li:person:abc123", commentary="Hello", video_path=video_path)
+
+    assert "urn:li:video:777" in str(error.value)
+    assert "--video-urn urn:li:video:777" in str(error.value)
